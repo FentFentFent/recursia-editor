@@ -45,6 +45,7 @@ class TargetPane extends React.Component {
             'handleDrop',
             'handleDuplicateSprite',
             'handleExportSprite',
+            'handleSetDependenciesSprite',
             'handleNewSprite',
             'handleNewSpriteClick',
             'handleSelectSprite',
@@ -57,6 +58,9 @@ class TargetPane extends React.Component {
         ]);
 
         this.processedSprites = {};
+        this.state = {
+            dependenciesSourceId: null
+        };
     }
     componentDidMount () {
         this.props.vm.addListener('BLOCK_DRAG_END', this.handleBlockDragEnd);
@@ -120,7 +124,46 @@ class TargetPane extends React.Component {
             downloadBlob(`${spriteName}.sprite3`, content);
         });
     }
+    handleSetDependenciesSprite (id) {
+        // Enter "set dependencies" mode for the selected sprite.
+        console.log('set dependencies requested for sprite', id);
+        this.props.vm.setEditingTarget(id);
+        if (this.props.stage && id !== this.props.stage.id) {
+            this.props.onHighlightTarget(id);
+        }
+        this.setState({dependenciesSourceId: id});
+        if (this.props.onShowSetDependenciesAlert) {
+            this.props.onShowSetDependenciesAlert();
+        }
+    }
     handleSelectSprite (id) {
+        const sourceId = this.state.dependenciesSourceId;
+        if (sourceId) {
+            if (id !== sourceId) {
+                const source = this.props.vm.runtime.getTargetById(sourceId);
+                const target = this.props.vm.runtime.getTargetById(id);
+                if (source && target) {
+                    if (source.dependencies.indexOf(id) !== -1) {
+                        source.removeDependency(target);
+                    } else {
+                        source.addDependency(target);
+                    }
+                    this.props.vm.emitTargetsUpdate();
+                }
+                // Exit the mode after a single toggle.
+                this.setState({dependenciesSourceId: null});
+                if (this.props.onCloseSetDependenciesAlert) {
+                    this.props.onCloseSetDependenciesAlert();
+                }
+            } else {
+                // Clicking the source sprite again exits the mode.
+                this.setState({dependenciesSourceId: null});
+                if (this.props.onCloseSetDependenciesAlert) {
+                    this.props.onCloseSetDependenciesAlert();
+                }
+            }
+            return;
+        }
         this.props.vm.setEditingTarget(id);
         if (this.props.stage && id !== this.props.stage.id) {
             this.props.onHighlightTarget(id);
@@ -292,6 +335,8 @@ class TargetPane extends React.Component {
                 onDrop={this.handleDrop}
                 onDuplicateSprite={this.handleDuplicateSprite}
                 onExportSprite={this.handleExportSprite}
+                onSetDependenciesSprite={this.handleSetDependenciesSprite}
+                setDependenciesMode={!!this.state.dependenciesSourceId}
                 onFileUploadClick={this.handleFileUploadClick}
                 onPaintSpriteClick={this.handlePaintSpriteClick}
                 onSelectSprite={this.handleSelectSprite}
@@ -349,7 +394,9 @@ const mapDispatchToProps = dispatch => ({
         dispatch(highlightTarget(id));
     },
     onCloseImporting: () => dispatch(closeAlertWithId('importingAsset')),
-    onShowImporting: () => dispatch(showStandardAlert('importingAsset'))
+    onShowImporting: () => dispatch(showStandardAlert('importingAsset')),
+    onShowSetDependenciesAlert: () => dispatch(showStandardAlert('setDependencies')),
+    onCloseSetDependenciesAlert: () => dispatch(closeAlertWithId('setDependencies'))
 });
 
 const mergeProps = (stateProps, dispatchProps, ownProps) => ({

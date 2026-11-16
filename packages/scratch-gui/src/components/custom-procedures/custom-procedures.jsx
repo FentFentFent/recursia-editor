@@ -115,6 +115,20 @@ const CustomProcedures = props => {
                         />
                     </label>
                 </div>
+                <div className={styles.checkboxRow}>
+                    <label>
+                        <input
+                            checked={props.doesReturn}
+                            type="checkbox"
+                            onChange={props.onToggleReturn}
+                        />
+                        <FormattedMessage
+                            defaultMessage="Does return?"
+                            description="Label for checkbox to return a value"
+                            id="gui.customProcedures.returns"
+                        />
+                    </label>
+                </div>
                 <Box className={styles.buttonRow}>
                     <button
                         className={styles.cancelButton}
@@ -144,11 +158,13 @@ const CustomProcedures = props => {
 
 CustomProcedures.propTypes = {
     componentRef: PropTypes.func.isRequired,
+    doesReturn: PropTypes.bool.isRequired,
     onAddBoolean: PropTypes.func.isRequired,
     onAddLabel: PropTypes.func.isRequired,
     onAddTextNumber: PropTypes.func.isRequired,
     onCancel: PropTypes.func.isRequired,
     onOk: PropTypes.func.isRequired,
+    onToggleReturn: PropTypes.func.isRequired,
     onToggleWarp: PropTypes.func.isRequired,
     warp: PropTypes.bool.isRequired
 };

@@ -65,6 +65,12 @@ const blockColors = {
         colourTertiary: '#FF6680',
         colorQuaternary: '#FF6680'
     },
+    modules: {
+        colourPrimary: '#331419',
+        colourSecondary: '#4C4C4C',
+        colourTertiary: '#c466ff',
+        colorQuaternary: '#ff66fc'
+    },
     text: 'rgba(255, 255, 255, .7)',
     textFieldText: '#E5E5E5',
     workspace: '#121212',

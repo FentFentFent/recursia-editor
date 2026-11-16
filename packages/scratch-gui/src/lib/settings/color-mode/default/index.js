@@ -69,6 +69,12 @@ const blockColors = {
         colourTertiary: '#FF3355',
         colourQuaternary: '#FF3355'
     },
+    modules: {
+        colourPrimary: '#c466ff',
+        colourSecondary: '#ff66fc',
+        colourTertiary: '#cd43e2',
+        colorQuaternary: '#cd43e2'
+    },
     text: '#FFFFFF',
     workspace: '#F9F9F9',
     toolboxHover: '#4C97FF',

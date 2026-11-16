@@ -187,6 +187,19 @@ class Thread {
         this.warpTimer = null;
 
         this.justReported = null;
+
+        /**
+         * Resolves the value a call block is waiting for, when this thread runs
+         * a procedure that reports a value.
+         * @type {?function}
+         */
+        this.procedureReturnResolve = null;
+
+        /**
+         * Value this thread's procedure reported to the block that called it.
+         * @type {*}
+         */
+        this.returnValue = '';
     }
 
     /**

@@ -994,6 +994,7 @@ class RenderedTarget extends Target {
         newClone.size = this.size;
         newClone.currentCostume = this.currentCostume;
         newClone.rotationStyle = this.rotationStyle;
+        newClone.dependencies = [...this.dependencies];
         newClone.effects = Clone.simple(this.effects);
         newClone.variables = this.duplicateVariables();
         newClone._edgeActivatedHatValues = Clone.simple(this._edgeActivatedHatValues);
@@ -1019,6 +1020,7 @@ class RenderedTarget extends Target {
             newTarget.size = this.size;
             newTarget.currentCostume = this.currentCostume;
             newTarget.rotationStyle = this.rotationStyle;
+            newTarget.dependencies = [...this.dependencies];
             newTarget.effects = JSON.parse(JSON.stringify(this.effects));
             newTarget.variables = this.duplicateVariables(newTarget.blocks);
             newTarget.updateAllDrawableProperties();
@@ -1114,7 +1116,8 @@ class RenderedTarget extends Target {
             tempo: this.tempo,
             volume: this.volume,
             videoTransparency: this.videoTransparency,
-            videoState: this.videoState
+            videoState: this.videoState,
+            dependencies: this.dependencies
 
         };
     }

@@ -4,7 +4,7 @@ const Blocks = require('./blocks');
 const Variable = require('../engine/variable');
 const Comment = require('../engine/comment');
 const uid = require('../util/uid');
-const {Map} = require('immutable');
+const { Map } = require('immutable');
 const log = require('../util/log');
 const StringUtil = require('../util/string-util');
 const VariableUtil = require('../util/variable-util');
@@ -22,7 +22,7 @@ class Target extends EventEmitter {
      * @param {?Blocks} blocks Blocks instance for the blocks owned by this target.
      * @class
      */
-    constructor (runtime, blocks) {
+    constructor(runtime,blocks) {
         super();
 
         if (!blocks) {
@@ -70,13 +70,102 @@ class Target extends EventEmitter {
          * @type {Object.<string, *>}
          */
         this._edgeActivatedHatValues = {};
+
+
+
+        /**
+         * Dependencies this target requires (dependencies are other targets)
+         * 
+         * All items must be valid target ids.
+         * @type {string[]}
+         */
+        this.dependencies = [];
+
+        /**
+         * Dependents this target has (dependents are other targets)
+         * 
+         * All items must be valid target ids.
+         * @type {string[]}
+         */
+        this.dependents = [];
+    }
+    /**
+     * Add a declared dependency to this target.
+     * @param {Target} target 
+     */
+    addDependency(target) {
+        if (target.id == this.id) throw new Error("Target can't import itself!");
+        if (this.dependents.includes(target.id)) return; // Unlike same-target errors, we silently fail for the GUI.
+        this.dependencies = this.dependencies.concat(target.id);
+        target.dependents = target.dependents.concat(this.id);
+    }
+    /**
+     * Remove a declared dependency from this target
+     * @param {Target} target 
+     */
+    removeDependency(target) {
+        if (target.id == this.id) throw new Error("Target can't remove itself as a dependency!");
+        this.dependencies = this.dependencies.filter(e => e !== target.id);
+        target.dependents = target.dependents.filter(e => e !== this.id);
+    }
+
+
+    /**
+     * Get a procedure's block information.
+     * @param {string} procedureCode 
+     * @returns {string[][]}
+     */
+    getProcedureParamNamesAndIds(procedureCode) {
+        const local = this.blocks.getProcedureParamNamesAndIds(procedureCode);
+
+        if (local != null) {
+            return local;
+        }
+
+        for (const id of this.dependencies) {
+            const target = this.runtime.getTargetById(id);
+            if (!target || !target.blocks) continue;
+
+            const result = target.blocks.getProcedureParamNamesAndIds(procedureCode);
+
+            if (result != null) {
+                return result;
+            }
+        }
+
+        return null;
+    }
+    /**
+     * Get a procedure's block information.
+     * @param {string} procedureCode 
+     * @returns {string[][]}
+     */
+    getProcedureParamNamesIdsAndDefaults(procedureCode) {
+        const local = this.blocks.getProcedureParamNamesIdsAndDefaults(procedureCode);
+
+        if (local != null) {
+            return local;
+        }
+
+        for (const id of this.dependencies) {
+            const target = this.runtime.getTargetById(id);
+            if (!target || !target.blocks) continue;
+
+            const result = target.blocks.getProcedureParamNamesIdsAndDefaults(procedureCode);
+
+            if (result != null) {
+                return result;
+            }
+        }
+
+        return null;
     }
 
     /**
      * Called when the project receives a "green flag."
      * @abstract
      */
-    onGreenFlag () {}
+    onGreenFlag() { }
 
     /**
      * Return a human-readable name for this target.
@@ -84,7 +173,7 @@ class Target extends EventEmitter {
      * @abstract
      * @returns {string} Human-readable name for the target.
      */
-    getName () {
+    getName() {
         return this.id;
     }
 
@@ -94,20 +183,20 @@ class Target extends EventEmitter {
      * @param {*} newValue Value to store for edge-activated hat.
      * @returns {*} The old value for the edge-activated hat.
      */
-    updateEdgeActivatedValue (blockId, newValue) {
+    updateEdgeActivatedValue(blockId,newValue) {
         const oldValue = this._edgeActivatedHatValues[blockId];
         this._edgeActivatedHatValues[blockId] = newValue;
         return oldValue;
     }
 
-    hasEdgeActivatedValue (blockId) {
-        return Object.prototype.hasOwnProperty.call(this._edgeActivatedHatValues, blockId);
+    hasEdgeActivatedValue(blockId) {
+        return Object.prototype.hasOwnProperty.call(this._edgeActivatedHatValues,blockId);
     }
 
     /**
      * Clear all edge-activated hat values.
      */
-    clearEdgeActivatedValues () {
+    clearEdgeActivatedValues() {
         this._edgeActivatedHatValues = {};
     }
 
@@ -118,15 +207,15 @@ class Target extends EventEmitter {
      * @param {string} name Name of the variable.
      * @returns {!Variable} Variable object.
      */
-    lookupOrCreateVariable (id, name) {
+    lookupOrCreateVariable(id,name) {
         let variable = this.lookupVariableById(id);
         if (variable) return variable;
 
-        variable = this.lookupVariableByNameAndType(name, Variable.SCALAR_TYPE);
+        variable = this.lookupVariableByNameAndType(name,Variable.SCALAR_TYPE);
         if (variable) return variable;
 
         // No variable with this name exists - create it locally.
-        const newVariable = new Variable(id, name, Variable.SCALAR_TYPE, false);
+        const newVariable = new Variable(id,name,Variable.SCALAR_TYPE,false);
         this.variables[id] = newVariable;
         return newVariable;
     }
@@ -138,7 +227,7 @@ class Target extends EventEmitter {
      * @param {string} name Name of the variable.
      * @returns {?Variable} Variable object.
      */
-    lookupBroadcastMsg (id, name) {
+    lookupBroadcastMsg(id,name) {
         let broadcastMsg;
         if (id) {
             broadcastMsg = this.lookupVariableById(id);
@@ -149,12 +238,12 @@ class Target extends EventEmitter {
         }
         if (broadcastMsg) {
             if (name && (broadcastMsg.name.toLowerCase() !== name.toLowerCase())) {
-                log.error(`Found broadcast message with id: ${id}, but` +
-                    `its name, ${broadcastMsg.name} did not match expected name ${name}.`);
+                log.error(`Found broadcast message with id: ${ id }, but` +
+                    `its name, ${ broadcastMsg.name } did not match expected name ${ name }.`);
             }
             if (broadcastMsg.type !== Variable.BROADCAST_MESSAGE_TYPE) {
-                log.error(`Found variable with id: ${id}, but its type ${broadcastMsg.type}` +
-                    `did not match expected type ${Variable.BROADCAST_MESSAGE_TYPE}`);
+                log.error(`Found variable with id: ${ id }, but its type ${ broadcastMsg.type }` +
+                    `did not match expected type ${ Variable.BROADCAST_MESSAGE_TYPE }`);
             }
             return broadcastMsg;
         }
@@ -167,7 +256,7 @@ class Target extends EventEmitter {
      * @param {string} name Name of the variable.
      * @returns {?Variable} Variable object.
      */
-    lookupBroadcastByInputValue (name) {
+    lookupBroadcastByInputValue(name) {
         const vars = this.variables;
         for (const propName in vars) {
             if ((vars[propName].type === Variable.BROADCAST_MESSAGE_TYPE) &&
@@ -184,15 +273,15 @@ class Target extends EventEmitter {
      * @param {string} name Name of the variable.
      * @returns {!Variable} Variable object.
      */
-    lookupVariableById (id) {
+    lookupVariableById(id) {
         // If we have a local copy, return it.
-        if (Object.prototype.hasOwnProperty.call(this.variables, id)) {
+        if (Object.prototype.hasOwnProperty.call(this.variables,id)) {
             return this.variables[id];
         }
         // If the stage has a global copy, return it.
         if (this.runtime && !this.isStage) {
             const stage = this.runtime.getTargetForStage();
-            if (stage && Object.prototype.hasOwnProperty.call(stage.variables, id)) {
+            if (stage && Object.prototype.hasOwnProperty.call(stage.variables,id)) {
                 return stage.variables[id];
             }
         }
@@ -207,7 +296,7 @@ class Target extends EventEmitter {
      * @param {?bool} skipStage Optional flag to skip checking the stage
      * @returns {?Variable} Variable object if found, or null if not.
      */
-    lookupVariableByNameAndType (name, type, skipStage) {
+    lookupVariableByNameAndType(name,type,skipStage) {
         if (typeof name !== 'string') return;
         if (typeof type !== 'string') type = Variable.SCALAR_TYPE;
         skipStage = skipStage || false;
@@ -241,15 +330,15 @@ class Target extends EventEmitter {
      * @param {!string} name Name of the list.
      * @returns {!Variable} Variable object representing the found/created list.
      */
-    lookupOrCreateList (id, name) {
+    lookupOrCreateList(id,name) {
         let list = this.lookupVariableById(id);
         if (list) return list;
 
-        list = this.lookupVariableByNameAndType(name, Variable.LIST_TYPE);
+        list = this.lookupVariableByNameAndType(name,Variable.LIST_TYPE);
         if (list) return list;
 
         // No variable with this name exists - create it locally.
-        const newList = new Variable(id, name, Variable.LIST_TYPE, false);
+        const newList = new Variable(id,name,Variable.LIST_TYPE,false);
         this.variables[id] = newList;
         return newList;
     }
@@ -263,9 +352,9 @@ class Target extends EventEmitter {
      * @param {boolean} isCloud Whether the variable to create has the isCloud flag set.
      * Additional checks are made that the variable can be created as a cloud variable.
      */
-    createVariable (id, name, type, isCloud) {
-        if (!Object.prototype.hasOwnProperty.call(this.variables, id)) {
-            const newVariable = new Variable(id, name, type, false);
+    createVariable(id,name,type,isCloud) {
+        if (!Object.prototype.hasOwnProperty.call(this.variables,id)) {
+            const newVariable = new Variable(id,name,type,false);
             if (isCloud && this.isStage && this.runtime.canAddCloudVariable()) {
                 newVariable.isCloud = true;
                 this.runtime.addCloudVariable();
@@ -287,18 +376,18 @@ class Target extends EventEmitter {
      * @param {number} height The height of the comment when it is full size
      * @param {boolean} minimized Whether the comment is minimized.
      */
-    createComment (id, blockId, text, x, y, width, height, minimized) {
-        if (!Object.prototype.hasOwnProperty.call(this.comments, id)) {
-            const newComment = new Comment(id, text, x, y,
-                width, height, minimized);
+    createComment(id,blockId,text,x,y,width,height,minimized) {
+        if (!Object.prototype.hasOwnProperty.call(this.comments,id)) {
+            const newComment = new Comment(id,text,x,y,
+                width,height,minimized);
             if (blockId) {
                 newComment.blockId = blockId;
                 const blockWithComment = this.blocks.getBlock(blockId);
                 if (blockWithComment) {
                     blockWithComment.comment = id;
                 } else {
-                    log.warn(`Could not find block with id ${blockId
-                    } associated with commentId: ${id}`);
+                    log.warn(`Could not find block with id ${ blockId
+                        } associated with commentId: ${ id }`);
                 }
             }
             this.comments[id] = newComment;
@@ -310,8 +399,8 @@ class Target extends EventEmitter {
      * @param {string} id Id of variable to rename.
      * @param {string} newName New name for the variable.
      */
-    renameVariable (id, newName) {
-        if (Object.prototype.hasOwnProperty.call(this.variables, id)) {
+    renameVariable(id,newName) {
+        if (Object.prototype.hasOwnProperty.call(this.variables,id)) {
             const variable = this.variables[id];
             if (variable.id === id) {
                 const oldName = variable.name;
@@ -319,7 +408,7 @@ class Target extends EventEmitter {
 
                 if (this.runtime) {
                     if (variable.isCloud && this.isStage) {
-                        this.runtime.ioDevices.cloud.requestRenameVariable(oldName, newName);
+                        this.runtime.ioDevices.cloud.requestRenameVariable(oldName,newName);
                     }
 
                     if (variable.type === Variable.SCALAR_TYPE) {
@@ -343,7 +432,7 @@ class Target extends EventEmitter {
                         element: 'field',
                         name: variable.type === Variable.LIST_TYPE ? 'LIST' : 'VARIABLE',
                         value: id
-                    }, this.runtime);
+                    },this.runtime);
                     const monitorBlock = blocks.getBlock(variable.id);
                     if (monitorBlock) {
                         this.runtime.requestUpdateMonitor(Map({
@@ -361,8 +450,8 @@ class Target extends EventEmitter {
      * Removes the variable with the given id from the dictionary of variables.
      * @param {string} id Id of variable to delete.
      */
-    deleteVariable (id) {
-        if (Object.prototype.hasOwnProperty.call(this.variables, id)) {
+    deleteVariable(id) {
+        if (Object.prototype.hasOwnProperty.call(this.variables,id)) {
             // Get info about the variable before deleting it
             const deletedVariableName = this.variables[id].name;
             const deletedVariableWasCloud = this.variables[id].isCloud;
@@ -383,7 +472,7 @@ class Target extends EventEmitter {
      * target-specific monitored blocks (e.g. local variables, global variables for the stage, x-position).
      * NOTE: This does not delete any of the stage monitors like backdrop name.
      */
-    deleteMonitors () {
+    deleteMonitors() {
         this.runtime.requestRemoveMonitorByTargetId(this.id);
         let targetSpecificMonitorBlockIds;
         if (this.isStage) {
@@ -407,8 +496,8 @@ class Target extends EventEmitter {
      * @returns {?Variable} The duplicated variable, or null if
      * the original variable was not found.
      */
-    duplicateVariable (id, optKeepOriginalId) {
-        if (Object.prototype.hasOwnProperty.call(this.variables, id)) {
+    duplicateVariable(id,optKeepOriginalId) {
+        if (Object.prototype.hasOwnProperty.call(this.variables,id)) {
             const originalVariable = this.variables[id];
             const newVariable = new Variable(
                 optKeepOriginalId ? id : null, // conditionally keep original id or generate a new one
@@ -434,22 +523,22 @@ class Target extends EventEmitter {
      * in this blocks container will be updated to refer to the corresponding new IDs.
      * @returns {object} The duplicated dictionary of variables
      */
-    duplicateVariables (optBlocks) {
+    duplicateVariables(optBlocks) {
         let allVarRefs;
         if (optBlocks) {
             allVarRefs = optBlocks.getAllVariableAndListReferences();
         }
-        return Object.keys(this.variables).reduce((accum, varId) => {
-            const newVariable = this.duplicateVariable(varId, !optBlocks);
+        return Object.keys(this.variables).reduce((accum,varId) => {
+            const newVariable = this.duplicateVariable(varId,!optBlocks);
             accum[newVariable.id] = newVariable;
             if (optBlocks && allVarRefs) {
                 const currVarRefs = allVarRefs[varId];
                 if (currVarRefs) {
-                    this.mergeVariables(varId, newVariable.id, currVarRefs);
+                    this.mergeVariables(varId,newVariable.id,currVarRefs);
                 }
             }
             return accum;
-        }, {});
+        },{});
     }
 
     /**
@@ -457,14 +546,14 @@ class Target extends EventEmitter {
      * @param {object} data An object with sprite info data to set.
      * @abstract
      */
-    postSpriteInfo () {}
+    postSpriteInfo() { }
 
     /**
      * Retrieve custom state associated with this target and the provided state ID.
      * @param {string} stateId - specify which piece of state to retrieve.
      * @returns {*} the associated state, if any was found.
      */
-    getCustomState (stateId) {
+    getCustomState(stateId) {
         return this._customState[stateId];
     }
 
@@ -473,7 +562,7 @@ class Target extends EventEmitter {
      * @param {string} stateId - specify which piece of state to store on this target.
      * @param {*} newValue - the state value to store.
      */
-    setCustomState (stateId, newValue) {
+    setCustomState(stateId,newValue) {
         this._customState[stateId] = newValue;
     }
 
@@ -481,7 +570,7 @@ class Target extends EventEmitter {
      * Call to destroy a target.
      * @abstract
      */
-    dispose () {
+    dispose() {
         this._customState = {};
 
         if (this.runtime) {
@@ -500,7 +589,7 @@ class Target extends EventEmitter {
      * @param {?bool} skipStage Optional flag to skip the stage.
      * @returns {Array<string>} A list of variable names
      */
-    getAllVariableNamesInScopeByType (type, skipStage) {
+    getAllVariableNamesInScopeByType(type,skipStage) {
         if (typeof type !== 'string') type = Variable.SCALAR_TYPE;
         skipStage = skipStage || false;
         const targetVariables = Object.values(this.variables)
@@ -524,13 +613,13 @@ class Target extends EventEmitter {
      * variable name in the references being updated should be replaced with this new name.
      * If this parameter is not provided or is '', no name change occurs.
      */
-    mergeVariables (idToBeMerged, idToMergeWith, optReferencesToUpdate, optNewName) {
+    mergeVariables(idToBeMerged,idToMergeWith,optReferencesToUpdate,optNewName) {
         const referencesToChange = optReferencesToUpdate ||
             // TODO should there be a separate helper function that traverses the blocks
             // for all references for a given ID instead of doing the below..?
             this.blocks.getAllVariableAndListReferences()[idToBeMerged];
 
-        VariableUtil.updateVariableIdentifiers(referencesToChange, idToMergeWith, optNewName);
+        VariableUtil.updateVariableIdentifiers(referencesToChange,idToMergeWith,optNewName);
     }
 
     /**
@@ -540,7 +629,7 @@ class Target extends EventEmitter {
      * that reference the given variable ID. The names and IDs of these variable
      * references will be updated to refer to the new (or pre-existing) global variable.
      */
-    shareLocalVariableToStage (varId, varRefs) {
+    shareLocalVariableToStage(varId,varRefs) {
         if (!this.runtime) return;
         const variable = this.variables[varId];
         if (!variable) {
@@ -555,7 +644,7 @@ class Target extends EventEmitter {
 
         // First check if we've already done the local to global transition for this
         // variable. If we have, merge it with the global variable we've already created.
-        const varIdForStage = `StageVarFromLocal_${varId}`;
+        const varIdForStage = `StageVarFromLocal_${ varId }`;
         let stageVar = stage.lookupVariableById(varIdForStage);
         // If a global var doesn't already exist, create a new one with a fresh name.
         // Use the ID we created above so that we can lookup this new variable in the
@@ -564,11 +653,11 @@ class Target extends EventEmitter {
             const varName = variable.name;
             const varType = variable.type;
 
-            const newStageName = `Stage: ${varName}`;
-            stageVar = this.runtime.createNewGlobalVariable(newStageName, varIdForStage, varType);
+            const newStageName = `Stage: ${ varName }`;
+            stageVar = this.runtime.createNewGlobalVariable(newStageName,varIdForStage,varType);
         }
         // Update all variable references to use the new name and ID
-        this.mergeVariables(varId, stageVar.id, varRefs, stageVar.name);
+        this.mergeVariables(varId,stageVar.id,varRefs,stageVar.name);
     }
 
     /**
@@ -578,7 +667,7 @@ class Target extends EventEmitter {
      * @param {Target} sprite The sprite to share the variable with
      * @param {Array<object>} varRefs A list of all the variable references currently being shared.
      */
-    shareLocalVariableToSprite (varId, sprite, varRefs) {
+    shareLocalVariableToSprite(varId,sprite,varRefs) {
         if (!this.runtime) return;
         if (this.isStage) return;
         const variable = this.variables[varId];
@@ -590,18 +679,18 @@ class Target extends EventEmitter {
         const varType = variable.type;
         // Check if the receiving sprite already has a variable of the same name and type
         // and use the existing variable, otherwise create a new one.
-        const existingLocalVar = sprite.lookupVariableByNameAndType(varName, varType);
+        const existingLocalVar = sprite.lookupVariableByNameAndType(varName,varType);
         let newVarId;
         if (existingLocalVar) {
             newVarId = existingLocalVar.id;
         } else {
-            const newVar = new Variable(null, varName, varType);
+            const newVar = new Variable(null,varName,varType);
             newVarId = newVar.id;
             sprite.variables[newVarId] = newVar;
         }
 
         // Merge with the local variable on the new sprite.
-        this.mergeVariables(varId, newVarId, varRefs);
+        this.mergeVariables(varId,newVarId,varRefs);
     }
 
     /**
@@ -628,7 +717,7 @@ class Target extends EventEmitter {
      * potential conflicting references to variables.
      * @param {Target} receivingTarget The target receiving the variables
      */
-    resolveVariableSharingConflictsWithTarget (blocks, receivingTarget) {
+    resolveVariableSharingConflictsWithTarget(blocks,receivingTarget) {
         if (this.isStage) return;
 
         // Get all the variable references in the given list of blocks
@@ -646,9 +735,9 @@ class Target extends EventEmitter {
             const currVarListRefs = allVarListRefs[varId];
 
             if (receivingTarget.isStage) {
-                this.shareLocalVariableToStage(varId, currVarListRefs);
+                this.shareLocalVariableToStage(varId,currVarListRefs);
             } else {
-                this.shareLocalVariableToSprite(varId, receivingTarget, currVarListRefs);
+                this.shareLocalVariableToSprite(varId,receivingTarget,currVarListRefs);
             }
         }
     }
@@ -690,12 +779,12 @@ class Target extends EventEmitter {
      * locals and anything still undefined must have been a global in the source
      * project.
      */
-    reconcileVariableReferences (createMissingOnStage = false) {
+    reconcileVariableReferences(createMissingOnStage = false) {
         if (!this.runtime) return;
         const stage = this.runtime.getTargetForStage();
         if (!stage || !stage.variables) return;
 
-        const allReferences = this.blocks.getAllVariableAndListReferences(null, true);
+        const allReferences = this.blocks.getAllVariableAndListReferences(null,true);
         const conflictIdsToReplace = Object.create(null);
         const conflictNamesToReplace = Object.create(null);
         // When a dangling reference triggers creation of a new stage variable with a
@@ -706,7 +795,7 @@ class Target extends EventEmitter {
         // meant one variable, not two. (Definitions created under their original name
         // need no such bookkeeping: later references find them via the by-name lookup.)
         const createdForOriginalName = Object.create(null);
-        const originalNameKey = (name, type) => `${type}\u0000${name}`;
+        const originalNameKey = (name,type) => `${ type }\u0000${ name }`;
 
         // Cache the list of all variable names by type so that we don't need to
         // re-calculate this in every iteration of the following loop.
@@ -735,9 +824,9 @@ class Target extends EventEmitter {
                     if (staleRef) {
                         conflictNamesToReplace[varId] = existing.name;
                         log.warn(
-                            `Reconciled stale displayed name on '${this.getName()}': updated to ` +
-                            `'${existing.name}' for id '${varId}' ` +
-                            `(was '${staleRef.referencingField.value}').`
+                            `Reconciled stale displayed name on '${ this.getName() }': updated to ` +
+                            `'${ existing.name }' for id '${ varId }' ` +
+                            `(was '${ staleRef.referencingField.value }').`
                         );
                     }
                 }
@@ -757,7 +846,7 @@ class Target extends EventEmitter {
             // rather than creating a second broadcast that differs only in case.
             const existingVar = isBroadcast ?
                 stage.lookupBroadcastByInputValue(varName) :
-                this.lookupVariableByNameAndType(varName, varType);
+                this.lookupVariableByNameAndType(varName,varType);
             if (existingVar) {
                 if (!conflictIdsToReplace[varId]) {
                     conflictIdsToReplace[varId] = existingVar.id;
@@ -767,18 +856,18 @@ class Target extends EventEmitter {
                     }
                     // On the stage, "this.variables" holds the globals; only a sprite's own
                     // variable is local.
-                    const isOwnVariable = Object.prototype.hasOwnProperty.call(this.variables, existingVar.id);
+                    const isOwnVariable = Object.prototype.hasOwnProperty.call(this.variables,existingVar.id);
                     const scope = (isOwnVariable && !this.isStage) ? 'local' : 'stage';
                     log.warn(
-                        `Reconciled dangling reference on '${this.getName()}': remapped id '${varId}' ` +
-                        `(name '${varName}', type '${varType}') to existing ${scope} variable '${existingVar.id}'.`
+                        `Reconciled dangling reference on '${ this.getName() }': remapped id '${ varId }' ` +
+                        `(name '${ varName }', type '${ varType }') to existing ${ scope } variable '${ existingVar.id }'.`
                     );
                 }
             } else if (createMissingOnStage) {
                 // Sprite import / backpack paste: a reference still undefined here was a
                 // global in the source project. Recreate it on the stage under a name
                 // that collides with nothing in this project.
-                const coalesceKey = originalNameKey(varName, varType);
+                const coalesceKey = originalNameKey(varName,varType);
                 const earlierCreated = createdForOriginalName[coalesceKey];
                 if (earlierCreated) {
                     // An earlier dangling reference in this pass already triggered creation
@@ -789,25 +878,25 @@ class Target extends EventEmitter {
                         conflictIdsToReplace[varId] = earlierCreated.id;
                         conflictNamesToReplace[varId] = earlierCreated.freshName;
                         log.warn(
-                            `Reconciled dangling reference on '${this.getName()}': coalesced id '${varId}' ` +
-                            `(name '${varName}', type '${varType}') with earlier-created stage variable ` +
-                            `'${earlierCreated.id}' (name '${earlierCreated.freshName}').`
+                            `Reconciled dangling reference on '${ this.getName() }': coalesced id '${ varId }' ` +
+                            `(name '${ varName }', type '${ varType }') with earlier-created stage variable ` +
+                            `'${ earlierCreated.id }' (name '${ earlierCreated.freshName }').`
                         );
                     }
                 } else {
                     const allNames = allVarNames(varType);
-                    const freshName = StringUtil.unusedName(varName, allNames);
-                    stage.createVariable(varId, freshName, varType);
+                    const freshName = StringUtil.unusedName(varName,allNames);
+                    stage.createVariable(varId,freshName,varType);
                     // Track the new name so unusedName accounts for it on subsequent calls,
                     // and remember which stage variable served this original name so
                     // future same-name dangling references coalesce instead of duplicating.
                     allNames.push(freshName);
-                    createdForOriginalName[coalesceKey] = {id: varId, freshName};
+                    createdForOriginalName[coalesceKey] = { id: varId,freshName };
                     if (!conflictNamesToReplace[varId]) {
                         conflictNamesToReplace[varId] = freshName;
                         log.warn(
-                            `Reconciled dangling reference on '${this.getName()}': created stage variable ` +
-                            `'${varId}' (name '${freshName}', type '${varType}').`
+                            `Reconciled dangling reference on '${ this.getName() }': created stage variable ` +
+                            `'${ varId }' (name '${ freshName }', type '${ varType }').`
                         );
                     }
                 }
@@ -822,13 +911,13 @@ class Target extends EventEmitter {
                 // sensing block. Later dangling references to this name on this target
                 // resolve to the new definition via the by-name lookup.
                 const owner = isBroadcast ? stage : this;
-                owner.createVariable(varId, varName, varType);
+                owner.createVariable(varId,varName,varType);
                 // Bring any other references to this id into agreement on the name.
                 conflictNamesToReplace[varId] = varName;
                 const scope = owner.isStage ? 'stage' : 'local';
                 log.warn(
-                    `Reconciled dangling reference on '${this.getName()}': created ${scope} variable ` +
-                    `'${varId}' (name '${varName}', type '${varType}').`
+                    `Reconciled dangling reference on '${ this.getName() }': created ${ scope } variable ` +
+                    `'${ varId }' (name '${ varName }', type '${ varType }').`
                 );
             }
         }
@@ -837,7 +926,7 @@ class Target extends EventEmitter {
         for (const conflictId in conflictIdsToReplace) {
             const existingId = conflictIdsToReplace[conflictId];
             const referencesToUpdate = allReferences[conflictId];
-            this.mergeVariables(conflictId, existingId, referencesToUpdate);
+            this.mergeVariables(conflictId,existingId,referencesToUpdate);
         }
 
         // Apply queued field-name updates so every reference to an id displays the
@@ -862,7 +951,7 @@ class Target extends EventEmitter {
      * directly so that legitimately-existing local-vs-global name collisions in
      * a saved project are not renamed.
      */
-    fixUpVariableReferences () {
+    fixUpVariableReferences() {
         if (!this.runtime) return;
         const stage = this.runtime.getTargetForStage();
         if (!stage || !stage.variables) return;
@@ -876,13 +965,13 @@ class Target extends EventEmitter {
         // distinction to disambiguate.
         if (this.isStage) return;
 
-        const renameConflictingLocalVar = (id, name, type) => {
-            const conflict = stage.lookupVariableByNameAndType(name, type);
+        const renameConflictingLocalVar = (id,name,type) => {
+            const conflict = stage.lookupVariableByNameAndType(name,type);
             if (conflict) {
                 const newName = StringUtil.unusedName(
-                    `${this.getName()}: ${name}`,
+                    `${ this.getName() }: ${ name }`,
                     this.getAllVariableNamesInScopeByType(type));
-                this.renameVariable(id, newName);
+                this.renameVariable(id,newName);
                 return newName;
             }
             return null;
@@ -891,11 +980,11 @@ class Target extends EventEmitter {
         // Walk the references again and rename any sprite-local variables whose
         // name and type collide with a stage global. References on this target
         // that point at the local are updated to use the new name.
-        const allReferences = this.blocks.getAllVariableAndListReferences(null, true);
+        const allReferences = this.blocks.getAllVariableAndListReferences(null,true);
         for (const varId in allReferences) {
-            if (!Object.prototype.hasOwnProperty.call(this.variables, varId)) continue;
+            if (!Object.prototype.hasOwnProperty.call(this.variables,varId)) continue;
             const varRef = allReferences[varId][0];
-            const newVarName = renameConflictingLocalVar(varId, varRef.referencingField.value, varRef.type);
+            const newVarName = renameConflictingLocalVar(varId,varRef.referencingField.value,varRef.type);
             if (newVarName) {
                 allReferences[varId].map(ref => {
                     ref.referencingField.value = newVarName;
@@ -907,10 +996,10 @@ class Target extends EventEmitter {
         // Rename any local variables that aren't referenced by any block but still
         // collide with a stage global, so the sprite remains internally consistent.
         for (const localVarId in this.variables) {
-            if (!Object.prototype.hasOwnProperty.call(this.variables, localVarId)) continue;
+            if (!Object.prototype.hasOwnProperty.call(this.variables,localVarId)) continue;
             if (allReferences[localVarId]) continue;
             const v = this.variables[localVarId];
-            renameConflictingLocalVar(localVarId, v.name, v.type);
+            renameConflictingLocalVar(localVarId,v.name,v.type);
         }
     }
 

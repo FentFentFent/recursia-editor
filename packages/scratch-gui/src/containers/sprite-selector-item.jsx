@@ -25,6 +25,7 @@ class SpriteSelectorItem extends React.PureComponent {
             'handleClick',
             'handleDuplicate',
             'handleExport',
+            'handleSetDependencies',
             'handlePointerEnter',
             'handlePointerLeave',
             'handleMouseDown',
@@ -113,6 +114,12 @@ class SpriteSelectorItem extends React.PureComponent {
         e.stopPropagation();
         this.props.onExportButtonClick(this.props.id);
     }
+    handleSetDependencies (e) {
+        e.stopPropagation();
+        if (this.props.onSetDependenciesButtonClick) {
+            this.props.onSetDependenciesButtonClick(this.props.id);
+        }
+    }
     handlePointerLeave () {
         this.props.dispatchSetHoveredSprite(null);
     }
@@ -148,6 +155,7 @@ class SpriteSelectorItem extends React.PureComponent {
             onDeleteButtonClick,
             onDuplicateButtonClick,
             onExportButtonClick,
+            onSetDependenciesButtonClick,
             dragPayload,
             receivedBlocks,
             costumeURL,
@@ -172,6 +180,7 @@ class SpriteSelectorItem extends React.PureComponent {
                 onDeleteButtonClick={onDeleteButtonClick ? this.handleDeleteButtonClick : null}
                 onDuplicateButtonClick={onDuplicateButtonClick ? this.handleDuplicate : null}
                 onExportButtonClick={onExportButtonClick ? this.handleExport : null}
+                onSetDependenciesButtonClick={this.props.onSetDependenciesButtonClick ? this.handleSetDependencies : null}
                 onMouseDown={this.handleMouseDown}
                 onPointerEnter={this.handlePointerEnter}
                 onPointerLeave={this.handlePointerLeave}

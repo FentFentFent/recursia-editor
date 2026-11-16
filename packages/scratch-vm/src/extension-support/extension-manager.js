@@ -36,8 +36,8 @@ const builtinExtensions = {
 /**
  * @typedef {object} ConvertedBlockInfo - Raw extension block data paired with processed data ready for scratch-blocks
  * @property {ExtensionBlockMetadata} info - the raw block info
- * @property {object} json - the scratch-blocks JSON definition for this block
- * @property {string} xml - the scratch-blocks XML definition for this block
+ * @property {object} [json] - the scratch-blocks JSON definition for this block, if it defines a block
+ * @property {string} xml - the scratch-blocks XML definition for this entry
  */
 
 /**
@@ -396,6 +396,16 @@ class ExtensionManager {
         case BlockType.BUTTON:
             if (blockInfo.opcode) {
                 log.warn(`Ignoring opcode "${blockInfo.opcode}" for button with text: ${blockInfo.text}`);
+            }
+            break;
+        case BlockType.LABEL:
+            if (blockInfo.opcode) {
+                log.warn(`Ignoring opcode "${blockInfo.opcode}" for label with text: ${blockInfo.text}`);
+            }
+            break;
+        case BlockType.XML:
+            if (blockInfo.opcode) {
+                log.warn(`Ignoring opcode "${blockInfo.opcode}" for XML entry`);
             }
             break;
         default: {

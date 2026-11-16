@@ -186,3 +186,116 @@ test('stepThreads', t => {
 
     t.end();
 });
+
+const makeCrossBoundaryTargets = runtime => {
+    const calleeSprite = new Sprite(null, runtime);
+    const callee = new RenderedTarget(calleeSprite, runtime);
+    callee.blocks.createBlock({
+        id: 'definition',
+        opcode: 'procedures_definition',
+        inputs: {custom_block: {name: 'custom_block', block: 'prototype', shadow: 'prototype'}},
+        fields: {},
+        next: 'say',
+        topLevel: true,
+        parent: null,
+        shadow: false,
+        x: 0,
+        y: 0
+    });
+    callee.blocks.createBlock({
+        id: 'prototype',
+        opcode: 'procedures_prototype',
+        inputs: {},
+        fields: {},
+        next: null,
+        topLevel: false,
+        parent: 'definition',
+        shadow: true,
+        mutation: {
+            tagName: 'mutation',
+            children: [],
+            proccode: 'do %s',
+            argumentids: '["msgId"]',
+            argumentnames: '["MSG"]',
+            argumentdefaults: '[""]',
+            warp: 'false'
+        }
+    });
+    callee.blocks.createBlock({
+        id: 'say',
+        opcode: 'looks_say',
+        inputs: {MESSAGE: {name: 'MESSAGE', block: 'reporter', shadow: 'reporter'}},
+        fields: {},
+        next: null,
+        topLevel: false,
+        parent: 'definition',
+        shadow: false
+    });
+    callee.blocks.createBlock({
+        id: 'reporter',
+        opcode: 'argument_reporter_string_number',
+        inputs: {},
+        fields: {VALUE: {name: 'VALUE', value: 'MSG'}},
+        next: null,
+        topLevel: false,
+        parent: 'say',
+        shadow: false
+    });
+
+    const callerSprite = new Sprite(null, runtime);
+    const caller = new RenderedTarget(callerSprite, runtime);
+    caller.addDependency(callee);
+
+    runtime.targets.push(callee, caller);
+
+    return {caller, callee};
+};
+
+test('stepToProcedureCrossBoundary moves the call params to the callee thread', t => {
+    const r = new Runtime();
+    const s = new Sequencer(r);
+    const {caller, callee} = makeCrossBoundaryTargets(r);
+
+    const callerThread = new Thread('call');
+    callerThread.target = caller;
+    callerThread.blockContainer = caller.blocks;
+    callerThread.pushStack('call');
+    callerThread.initParams();
+    callerThread.pushParam('MSG', 'hello');
+    r.threads.push(callerThread);
+
+    t.ok(s.stepToProcedureCrossBoundary(callerThread, 'do %s'), 'the procedure was started');
+
+    const calleeThread = r.threads.find(thread => thread !== callerThread);
+    t.equal(calleeThread.target, callee, 'the procedure runs on the dependency target');
+    t.equal(calleeThread.getParam('MSG'), 'hello', 'the callee sees the params of the call');
+    t.equal(callerThread.peekStackFrame().params, null, 'the caller no longer holds the params');
+    t.equal(callerThread.status, Thread.STATUS_PROMISE_WAIT, 'the caller waits for the callee');
+    t.end();
+});
+
+test('stepToProcedureCrossBoundary passes the params into the running body', t => {
+    const r = new Runtime();
+    const s = new Sequencer(r);
+    const said = [];
+    r._primitives.looks_say = args => {
+        said.push(args.MESSAGE);
+    };
+    const {caller} = makeCrossBoundaryTargets(r);
+
+    const callerThread = new Thread('call');
+    callerThread.target = caller;
+    callerThread.blockContainer = caller.blocks;
+    callerThread.pushStack('call');
+    callerThread.initParams();
+    callerThread.pushParam('MSG', 'hello');
+    r.threads.push(callerThread);
+
+    t.ok(s.stepToProcedureCrossBoundary(callerThread, 'do %s'), 'the procedure was started');
+
+    const calleeThread = r.threads.find(thread => thread !== callerThread);
+    s.stepThread(calleeThread);
+
+    t.same(said, ['hello'], 'the procedure body receives the argument value');
+    t.end();
+});

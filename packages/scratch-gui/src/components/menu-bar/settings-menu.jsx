@@ -10,7 +10,7 @@ import MenuBarMenu from './menu-bar-menu.jsx';
 import {MenuSection} from '../menu/menu.jsx';
 import PreferenceMenu from './preference-menu.jsx';
 
-import {DEFAULT_MODE, HIGH_CONTRAST_MODE, colorModeMap} from '../../lib/settings/color-mode/index.js';
+import {DARK_MODE, DEFAULT_MODE, HIGH_CONTRAST_MODE, colorModeMap} from '../../lib/settings/color-mode/index.js';
 import {themeMap} from '../../lib/settings/theme/index.js';
 import {persistColorMode} from '../../lib/settings/color-mode/persistence.js';
 import {persistTheme} from '../../lib/settings/theme/persistence.js';
@@ -29,7 +29,7 @@ const settingsMenuAriaMessage = defineMessage({
     description: 'accessibility label for settings menu'
 });
 
-const enabledColorModes = [DEFAULT_MODE, HIGH_CONTRAST_MODE];
+const enabledColorModes = [DEFAULT_MODE, HIGH_CONTRAST_MODE, DARK_MODE];
 
 const SettingsMenu = ({
     canChangeLanguage,

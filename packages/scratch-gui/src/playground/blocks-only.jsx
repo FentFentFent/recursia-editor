@@ -15,8 +15,8 @@ const mapStateToProps = state => ({vm: state.scratchGui.vm});
 const VMBlocks = connect(mapStateToProps)(Blocks);
 const VMControls = connect(mapStateToProps)(Controls);
 
-const BlocksOnly = props => (
-    <GUI {...props}>
+const BlocksOnly = props => {
+    return (<GUI {...props}>
         <VMBlocks
             grow={1}
             options={{
@@ -24,8 +24,9 @@ const BlocksOnly = props => (
             }}
         />
         <VMControls className={styles.controls} />
-    </GUI>
-);
+    </GUI>);
+    
+};
 
 const App = AppStateHOC(HashParserHOC(BlocksOnly));
 

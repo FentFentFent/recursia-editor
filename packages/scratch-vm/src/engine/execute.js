@@ -2,7 +2,7 @@ const BlockUtility = require('./block-utility');
 const BlocksExecuteCache = require('./blocks-execute-cache');
 const log = require('../util/log');
 const Thread = require('./thread');
-const {Map} = require('immutable');
+const { Map } = require('immutable');
 const cast = require('../util/cast');
 
 /**
@@ -52,7 +52,7 @@ const isPromise = function (value) {
  */
 // @todo move this to callback attached to the thread when we have performance
 // metrics (dd)
-const handleReport = function (resolvedValue, sequencer, thread, blockCached, lastOperation) {
+const handleReport = function (resolvedValue,sequencer,thread,blockCached,lastOperation) {
     const currentBlockId = blockCached.id;
     const opcode = blockCached.opcode;
     const isHat = blockCached._isHat;
@@ -86,7 +86,7 @@ const handleReport = function (resolvedValue, sequencer, thread, blockCached, la
         // at the top of the thread stack.
         if (lastOperation && typeof resolvedValue !== 'undefined' && thread.atStackTop()) {
             if (thread.stackClick) {
-                sequencer.runtime.visualReport(currentBlockId, resolvedValue);
+                sequencer.runtime.visualReport(currentBlockId,resolvedValue);
             }
             if (thread.updateMonitor) {
                 const targetId = sequencer.runtime.monitorBlocks.getBlock(currentBlockId).targetId;
@@ -106,14 +106,14 @@ const handleReport = function (resolvedValue, sequencer, thread, blockCached, la
     }
 };
 
-const handlePromise = (primitiveReportedValue, sequencer, thread, blockCached, lastOperation) => {
+const handlePromise = (primitiveReportedValue,sequencer,thread,blockCached,lastOperation) => {
     if (thread.status === Thread.STATUS_RUNNING) {
         // Primitive returned a promise; automatically yield thread.
         thread.status = Thread.STATUS_PROMISE_WAIT;
     }
     // Promise handlers
     primitiveReportedValue.then(resolvedValue => {
-        handleReport(resolvedValue, sequencer, thread, blockCached, lastOperation);
+        handleReport(resolvedValue,sequencer,thread,blockCached,lastOperation);
         // If it's a command block or a top level reporter in a stackClick.
         if (lastOperation) {
             let stackFrame;
@@ -137,10 +137,10 @@ const handlePromise = (primitiveReportedValue, sequencer, thread, blockCached, l
 
             thread.pushStack(nextBlockId);
         }
-    }, rejectionReason => {
+    },rejectionReason => {
         // Promise rejected: the primitive had some error.
         // Log it and proceed.
-        log.warn('Primitive rejected promise: ', rejectionReason);
+        log.warn('Primitive rejected promise: ',rejectionReason);
         thread.status = Thread.STATUS_RUNNING;
         thread.popStack();
     });
@@ -161,7 +161,7 @@ const handlePromise = (primitiveReportedValue, sequencer, thread, blockCached, l
  * @param {object} cached default set of cached values
  */
 class BlockCached {
-    constructor (blockContainer, cached) {
+    constructor(blockContainer,cached) {
         /**
          * Block id in its parent set of blocks.
          * @type {string}
@@ -223,7 +223,7 @@ class BlockCached {
         this._definedBlockFunction = false;
 
         /**
-         * Is this block a block with no function but a static value to return.
+         * Is the block a block with no function but a static value to return.
          * @type {boolean}
          */
         this._isShadowBlock = false;
@@ -238,17 +238,17 @@ class BlockCached {
          * A copy of the block's fields that may be modified.
          * @type {object}
          */
-        this._fields = Object.assign({}, this.fields);
+        this._fields = Object.assign({},this.fields);
 
         /**
          * A copy of the block's inputs that may be modified.
          * @type {object}
          */
-        this._inputs = Object.assign({}, this.inputs);
+        this._inputs = Object.assign({},this.inputs);
 
         /**
          * An arguments object for block implementations. All executions of this
-         * specific block will use this objecct.
+         * specific block will use this object.
          * @type {object}
          */
         this._argValues = {
@@ -272,15 +272,14 @@ class BlockCached {
          * A sequence of non-shadow operations that can must be performed. This
          * list recreates the order this block and its children are executed.
          * Since the order is always the same we can safely store that order
-         * and iterate over the operations instead of dynamically walking the
-         * tree every time.
+         * and iterate over the operations instead of dynamically walking them.
          * @type {Array<BlockCached>}
          */
         this._ops = [];
 
-        const {runtime} = blockUtility.sequencer;
+        const { runtime } = blockUtility.sequencer;
 
-        const {opcode, fields, inputs} = this;
+        const { opcode,fields,inputs } = this;
 
         // Assign opcode isHat and blockFunction data to avoid dynamic lookups.
         this._isHat = runtime.getIsHat(opcode);
@@ -343,11 +342,11 @@ class BlockCached {
         // Cache all input children blocks in the operation lists. The
         // operations can later be run in the order they appear in correctly
         // executing the operations quickly in a flat loop instead of needing to
-        // recursivly iterate them.
+        // recursively iterate them.
         for (const inputName in this._inputs) {
             const input = this._inputs[inputName];
             if (input.block) {
-                const inputCached = BlocksExecuteCache.getCached(blockContainer, input.block, BlockCached);
+                const inputCached = BlocksExecuteCache.getCached(blockContainer,input.block,BlockCached);
 
                 if (inputCached._isHat) {
                     continue;
@@ -370,6 +369,13 @@ class BlockCached {
         if (this._definedBlockFunction) {
             this._ops.push(this);
         }
+
+        // Cache operation positions for fast reported-value restoration.
+        // BlockCached instances are invalidated when their underlying blocks change.
+        this._opIndices = Object.create(null);
+        for (let i = 0; i < this._ops.length; i++) {
+            this._opIndices[this._ops[i].id] = i;
+        }
     }
 }
 
@@ -379,7 +385,7 @@ class BlockCached {
  * @param {Profiler} profiler - The profiler that is currently enabled.
  * @param {BlockCached} blockCached - The blockCached instance to profile.
  */
-const _prepareBlockProfiling = function (profiler, blockCached) {
+const _prepareBlockProfiling = function (profiler,blockCached) {
     blockCached._profiler = profiler;
 
     if (blockFunctionProfilerId === -1) {
@@ -388,7 +394,7 @@ const _prepareBlockProfiling = function (profiler, blockCached) {
 
     const ops = blockCached._ops;
     for (let i = 0; i < ops.length; i++) {
-        ops[i]._profilerFrame = profiler.frame(blockFunctionProfilerId, ops[i].opcode);
+        ops[i]._profilerFrame = profiler.frame(blockFunctionProfilerId,ops[i].opcode);
     }
 };
 
@@ -397,7 +403,7 @@ const _prepareBlockProfiling = function (profiler, blockCached) {
  * @param {!Sequencer} sequencer Which sequencer is executing.
  * @param {!Thread} thread Thread which to read and execute.
  */
-const execute = function (sequencer, thread) {
+const execute = function (sequencer,thread) {
     const runtime = sequencer.runtime;
 
     // store sequencer and thread so block functions can access them through
@@ -410,10 +416,10 @@ const execute = function (sequencer, thread) {
     const currentStackFrame = thread.peekStackFrame();
 
     let blockContainer = thread.blockContainer;
-    let blockCached = BlocksExecuteCache.getCached(blockContainer, currentBlockId, BlockCached);
+    let blockCached = BlocksExecuteCache.getCached(blockContainer,currentBlockId,BlockCached);
     if (blockCached === null) {
         blockContainer = runtime.flyoutBlocks;
-        blockCached = BlocksExecuteCache.getCached(blockContainer, currentBlockId, BlockCached);
+        blockCached = BlocksExecuteCache.getCached(blockContainer,currentBlockId,BlockCached);
         // Stop if block or target no longer exists.
         if (blockCached === null) {
             // No block found: stop the thread; script no longer exists.
@@ -430,11 +436,11 @@ const execute = function (sequencer, thread) {
         const reported = currentStackFrame.reported;
         // Reinstate all the previous values.
         for (; i < reported.length; i++) {
-            const {opCached: oldOpCached, inputValue} = reported[i];
+            const { opCached: oldOpCached,inputValue } = reported[i];
+            const opIndex = blockCached._opIndices[oldOpCached];
 
-            const opCached = ops.find(op => op.id === oldOpCached);
-
-            if (opCached) {
+            if (opIndex !== undefined) {
+                const opCached = ops[opIndex];
                 const inputName = opCached._parentKey;
                 const argValues = opCached._parentValues;
 
@@ -454,12 +460,17 @@ const execute = function (sequencer, thread) {
         // candidate. If an earlier block that was performed was removed then
         // we'll find the index where the last operation is now.
         if (reported.length > 0) {
-            const lastExisting = reported.reverse().find(report => ops.find(op => op.id === report.opCached));
-            if (lastExisting) {
-                i = ops.findIndex(opCached => opCached.id === lastExisting.opCached) + 1;
-            } else {
-                i = 0;
+            let lastExistingIndex = -1;
+
+            for (let r = reported.length - 1; r >= 0; r--) {
+                const reportedIndex = blockCached._opIndices[reported[r].opCached];
+                if (reportedIndex !== undefined) {
+                    lastExistingIndex = reportedIndex;
+                    break;
+                }
             }
+
+            i = lastExistingIndex + 1;
         }
 
         // The reporting block must exist and must be the next one in the sequence of operations.
@@ -490,6 +501,11 @@ const execute = function (sequencer, thread) {
 
     const start = i;
 
+    // Request script glow once instead of checking on every operation.
+    if (!blockContainer.forceNoGlow) {
+        thread.requestScriptGlowInFrame = true;
+    }
+
     for (; i < length; i++) {
         const lastOperation = i === length - 1;
         const opCached = ops[i];
@@ -501,21 +517,13 @@ const execute = function (sequencer, thread) {
 
         // Fields are set during opCached initialization.
 
-        // Blocks should glow when a script is starting,
-        // not after it has finished (see #1404).
-        // Only blocks in blockContainers that don't forceNoGlow
-        // should request a glow.
-        if (!blockContainer.forceNoGlow) {
-            thread.requestScriptGlowInFrame = true;
-        }
-
         // Inputs are set during previous steps in the loop.
 
-        const primitiveReportedValue = blockFunction(argValues, blockUtility);
+        const primitiveReportedValue = blockFunction(argValues,blockUtility);
 
         // If it's a promise, wait until promise resolves.
         if (isPromise(primitiveReportedValue)) {
-            handlePromise(primitiveReportedValue, sequencer, thread, opCached, lastOperation);
+            handlePromise(primitiveReportedValue,sequencer,thread,opCached,lastOperation);
 
             // Store the already reported values. They will be thawed into the
             // future versions of the same operations by block id. The reporting
@@ -523,31 +531,30 @@ const execute = function (sequencer, thread) {
             // that time.
             thread.justReported = null;
             currentStackFrame.reporting = ops[i].id;
-            currentStackFrame.reported = ops.slice(0, i).map(reportedCached => {
+
+            const reported = new Array(i);
+            for (let j = 0; j < i; j++) {
+                const reportedCached = ops[j];
                 const inputName = reportedCached._parentKey;
                 const reportedValues = reportedCached._parentValues;
 
-                if (inputName === 'BROADCAST_INPUT') {
-                    return {
-                        opCached: reportedCached.id,
-                        inputValue: reportedValues[inputName].BROADCAST_OPTION.name
-                    };
-                }
-                return {
+                reported[j] = {
                     opCached: reportedCached.id,
-                    inputValue: reportedValues[inputName]
+                    inputValue: inputName === 'BROADCAST_INPUT'
+                        ? reportedValues.BROADCAST_OPTION.name
+                        : reportedValues[inputName]
                 };
-            });
+            }
+            currentStackFrame.reported = reported;
 
             // We are waiting for a promise. Stop running this set of operations
             // and continue them later after thawing the reported values.
             break;
         } else if (thread.status === Thread.STATUS_RUNNING) {
             if (lastOperation) {
-                handleReport(primitiveReportedValue, sequencer, thread, opCached, lastOperation);
+                handleReport(primitiveReportedValue,sequencer,thread,opCached,lastOperation);
             } else {
-                // By definition a block that is not last in the list has a
-                // parent.
+                // By definition a block that is not last in the list has a parent.
                 const inputName = opCached._parentKey;
                 const parentValues = opCached._parentValues;
 
@@ -565,13 +572,13 @@ const execute = function (sequencer, thread) {
 
     if (runtime.profiler !== null) {
         if (blockCached._profiler !== runtime.profiler) {
-            _prepareBlockProfiling(runtime.profiler, blockCached);
+            _prepareBlockProfiling(runtime.profiler,blockCached);
         }
         // Determine the index that is after the last executed block. `i` is
         // currently the block that was just executed. `i + 1` will be the block
         // after that. `length` with the min call makes sure we don't try to
         // reference an operation outside of the set of operations.
-        const end = Math.min(i + 1, length);
+        const end = Math.min(i + 1,length);
         for (let p = start; p < end; p++) {
             ops[p]._profilerFrame.count += 1;
         }

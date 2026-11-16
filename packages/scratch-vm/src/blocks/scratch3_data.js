@@ -250,7 +250,7 @@ class Scratch3DataBlocks {
      * @constant {number}
      */
     static get LIST_ITEM_LIMIT () {
-        return 200000;
+        return Infinity;
     }
 }
 

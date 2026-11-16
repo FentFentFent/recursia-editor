@@ -53,6 +53,13 @@ class Sequencer {
         this.runtime = runtime;
 
         this.activeThread = null;
+
+        /**
+         * Whether a procedure returned its value to a call that may have
+         * already taken its turn in the current pass.
+         * @type {boolean}
+         */
+        this.resumedProcedureCaller = false;
     }
 
     /**
@@ -160,10 +167,33 @@ class Sequencer {
                         this.runtime.threads[nextActiveThread] = thread;
                         nextActiveThread++;
                     } else {
+                        // Resume the parent thread after a cross-boundary procedure finishes.
+                        if (thread.procedureParent) {
+                            const parentThread = thread.procedureParent;
+
+                            if (parentThread.status === Thread.STATUS_PROMISE_WAIT) {
+                                parentThread.status = Thread.STATUS_RUNNING;
+                            }
+
+                            thread.procedureParent = null;
+                        }
+
+                        // A procedure that ends without returning still has to
+                        // report a value to the call waiting on it.
+                        this._resolveProcedureReturn(thread);
+
                         doneThreads.push(thread);
                     }
                 }
                 this.runtime.threads.length = nextActiveThread;
+            }
+
+            // A procedure can return after its call's thread took its turn in
+            // this pass, which leaves that thread runnable but not counted.
+            // Step again so the call resumes in the same step as the return.
+            if (this.resumedProcedureCaller) {
+                this.resumedProcedureCaller = false;
+                numActiveThreads = Math.max(numActiveThreads, 1);
             }
         }
 
@@ -300,6 +330,237 @@ class Sequencer {
     }
 
     /**
+     * Step a procedure across a module (sprite) boundary.
+     *
+     * Creates a new thread under the requested block's target.
+     * The calling thread waits until the new thread finishes.
+     *
+     * @param {!Thread} callerThread Thread calling the procedure.
+     * @param {!string} procedureCode Procedure code to execute.
+     * @returns {boolean} Whether a procedure was found and started.
+     */
+    stepToProcedureCrossBoundary(callerThread,procedureCode) {
+        const callerTarget = callerThread.target;
+
+        if (!callerTarget || !Array.isArray(callerTarget.dependencies)) {
+            return false;
+        }
+
+        // Resolve the procedure through the caller's dependencies.
+        const found = this._findProcedureDefinition(callerThread, procedureCode);
+
+        if (!found) {
+            return false;
+        }
+
+        const calleeThread = this._startProcedureThread(
+            callerThread,
+            found.definition,
+            found.target,
+            procedureCode
+        );
+
+        // Track the calling thread so it can resume when this one finishes.
+        calleeThread.procedureParent = callerThread;
+
+        // Suspend the calling thread.
+        callerThread.status = Thread.STATUS_PROMISE_WAIT;
+
+        // Schedule the procedure thread.
+        this.runtime.threads.push(calleeThread);
+
+        return true;
+    }
+
+    /**
+     * Find a procedure definition for a call: first on the calling target, then
+     * on the targets it depends on.
+     * @param {!Thread} callerThread Thread calling the procedure.
+     * @param {!string} procedureCode Procedure code being called.
+     * @returns {?{definition: string, target: Target}} The definition block and
+     *     the target owning it, or null if the procedure was not found.
+     */
+    _findProcedureDefinition (callerThread, procedureCode) {
+        const callerTarget = callerThread.target;
+
+        if (!callerTarget || !callerTarget.blocks) {
+            return null;
+        }
+
+        const localDefinition = callerTarget.blocks.getProcedureDefinition(procedureCode);
+        if (localDefinition) {
+            return {definition: localDefinition, target: callerTarget};
+        }
+
+        if (!Array.isArray(callerTarget.dependencies)) {
+            return null;
+        }
+
+        for (const dependencyId of callerTarget.dependencies) {
+            const dependencyTarget = this.runtime.getTargetById(dependencyId);
+
+            if (!dependencyTarget || !dependencyTarget.blocks) {
+                continue;
+            }
+
+            const definition = dependencyTarget.blocks.getProcedureDefinition(procedureCode);
+            if (definition) {
+                return {definition, target: dependencyTarget};
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Start a procedure on a thread of its own, moving the call's parameters
+     * onto it.
+     *
+     * The thread starts at the procedure definition, above a frame standing in
+     * for the call itself. Stepping off the definition replaces its frame with
+     * the first block of the body, and frames are reset when they are reused, so
+     * the parameters have to live below the definition.
+     * @param {!Thread} callerThread Thread calling the procedure.
+     * @param {!string} definition Id of the procedure definition block.
+     * @param {!Target} procedureTarget Target owning the definition.
+     * @param {!string} procedureCode Procedure code being called.
+     * @returns {!Thread} The thread created for the procedure.
+     */
+    _startProcedureThread (callerThread, definition, procedureTarget, procedureCode) {
+        const calleeThread = new Thread(definition);
+
+        calleeThread.target = procedureTarget;
+        calleeThread.blockContainer = procedureTarget.blocks;
+
+        calleeThread.pushStack(null);
+        calleeThread.pushStack(definition);
+
+        // Transfer parameters from the procedure call: the callee does not
+        // share the caller's stack, so the values move onto the call frame.
+        const callerFrame = callerThread.peekStackFrame();
+        if (callerFrame && callerFrame.params) {
+            calleeThread.peekParentStackFrame().params = callerFrame.params;
+            // The caller keeps its stack frame while it waits, so dropping the
+            // values here keeps them from being visible once it resumes.
+            callerFrame.params = null;
+        }
+
+        // Preserve the recursion context for subsequent procedure calls.
+        calleeThread.procedureCallStack = [
+            ...(callerThread.procedureCallStack || []),
+            procedureCode
+        ];
+
+        if (this._isWarpProcedure(procedureTarget, definition)) {
+            calleeThread.peekStackFrame().warpMode = true;
+        }
+
+        return calleeThread;
+    }
+
+    /**
+     * Whether a procedure runs without screen refresh.
+     * @param {!Target} procedureTarget Target owning the definition.
+     * @param {!string} definition Id of the procedure definition block.
+     * @returns {boolean} True if the procedure is in warp mode.
+     */
+    _isWarpProcedure (procedureTarget, definition) {
+        const definitionBlock = procedureTarget.blocks.getBlock(definition);
+        if (!definitionBlock) return false;
+
+        const customBlockInput = definitionBlock.inputs.custom_block;
+        if (!customBlockInput) return false;
+
+        const prototypeBlock = procedureTarget.blocks.getBlock(customBlockInput.block);
+        if (!prototypeBlock || !prototypeBlock.mutation) return false;
+
+        const warp = prototypeBlock.mutation.warp;
+        if (typeof warp === 'boolean') return warp;
+        if (typeof warp === 'string') return JSON.parse(warp);
+        return false;
+    }
+
+    /**
+     * Step a procedure that reports a value back to the calling block.
+     *
+     * The procedure runs on its own thread and the calling block waits for the
+     * value it returns.
+     * @param {!Thread} callerThread Thread calling the procedure.
+     * @param {!string} procedureCode Procedure code to execute.
+     * @returns {?object} Thenable for the value the procedure returns, or null
+     *     if the procedure was not found.
+     */
+    stepToReturningProcedure (callerThread, procedureCode) {
+        const found = this._findProcedureDefinition(callerThread, procedureCode);
+
+        if (!found) {
+            return null;
+        }
+
+        const calleeThread = this._startProcedureThread(
+            callerThread,
+            found.definition,
+            found.target,
+            procedureCode
+        );
+
+        // The calling block waits on a thenable that the procedure resolves
+        // from its return block. Resolving it directly, rather than through a
+        // Promise, resumes the caller in the same sequencer step as the return
+        // instead of on the next frame.
+        const returned = {
+            then: resolve => {
+                calleeThread.procedureReturnResolve = resolve;
+            }
+        };
+
+        // The calling block suspends its thread by returning this thenable.
+        this.runtime.threads.push(calleeThread);
+
+        return returned;
+    }
+
+    /**
+     * End the procedure running on a thread, reporting a value to its call.
+     *
+     * The thread unwinds to the procedure call that started it. A call on the
+     * caller's own thread continues after the call block; a call on its own
+     * thread ends, and the value goes to the block waiting for it.
+     * @param {!Thread} thread Thread running the procedure.
+     * @param {*} value Value the call block should report.
+     */
+    returnFromProcedure (thread, value) {
+        thread.returnValue = value;
+
+        while (thread.stack.length > 0) {
+            const block = thread.target.blocks.getBlock(thread.peekStack());
+            if (block && block.opcode === 'procedures_call') break;
+            thread.popStack();
+        }
+
+        if (thread.stack.length === 0) {
+            thread.status = Thread.STATUS_DONE;
+        }
+
+        this._resolveProcedureReturn(thread);
+    }
+
+    /**
+     * Hand a finished procedure's return value to the call waiting on it.
+     * @param {!Thread} thread Thread that ran the procedure.
+     */
+    _resolveProcedureReturn (thread) {
+        if (!thread.procedureReturnResolve) return;
+
+        const resolve = thread.procedureReturnResolve;
+        thread.procedureReturnResolve = null;
+        resolve(thread.returnValue);
+
+        this.resumedProcedureCaller = true;
+    }
+
+
+    /**
      * Step a procedure.
      * @param {!Thread} thread Thread object to step to procedure.
      * @param {!string} procedureCode Procedure code of procedure to step to.
@@ -307,6 +568,8 @@ class Sequencer {
     stepToProcedure (thread, procedureCode) {
         const definition = thread.target.blocks.getProcedureDefinition(procedureCode);
         if (!definition) {
+
+            this.stepToProcedureCrossBoundary(thread,procedureCode);
             return;
         }
         // Check if the call is recursive.
@@ -355,6 +618,7 @@ class Sequencer {
         thread.stackFrame = [];
         thread.requestScriptGlowInFrame = false;
         thread.status = Thread.STATUS_DONE;
+        this._resolveProcedureReturn(thread);
     }
 }
 

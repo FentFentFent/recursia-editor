@@ -73,3 +73,21 @@ body .icon {
 .sprite-input {
     width: 8rem;
 }
+
+.dependenciesRow {
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.dependenciesPill {
+    display: inline-block;
+    padding: 0.125rem 0.5rem;
+    border: 1px solid $ui-black-transparent;
+    border-radius: 1rem;
+    background-color: white;
+    color: $text-primary;
+    font-size: 0.625rem;
+}

@@ -4,6 +4,7 @@ const ArgumentType = require('../../src/extension-support/argument-type');
 const BlockType = require('../../src/extension-support/block-type');
 const Runtime = require('../../src/engine/runtime');
 const ScratchBlocksConstants = require('../../src/engine/scratch-blocks-constants');
+const StyleType = require('../../src/extension-support/style-type');
 
 /**
  * @type {ExtensionMetadata}
@@ -78,6 +79,30 @@ const testExtensionInfo = {
                     type: ArgumentType.NUMBER
                 }
             }
+        },
+        {
+            blockType: BlockType.LABEL,
+            text: 'a "label" & more'
+        },
+        {
+            blockType: BlockType.XML,
+            xml: '<block type="test_xmlBlock"></block>'
+        },
+        {
+            opcode: 'styled',
+            blockType: BlockType.COMMAND,
+            text: 'styled with several styles',
+            style: [
+                StyleType.BowlerHat,
+                StyleType.MinimalPadding,
+                StyleType.BigRoundedCorners
+            ]
+        },
+        {
+            opcode: 'singleStyled',
+            blockType: BlockType.REPORTER,
+            text: 'single style',
+            style: StyleType.NoRoundedCorners
         }
     ]
 };
@@ -190,6 +215,28 @@ const testSeparator = function (t, separator) {
     t.equal(separator.xml, '<sep gap="36"/>');
 };
 
+const testLabel = function (t, label) {
+    t.same(label.json, null); // should be null or undefined
+    t.equal(label.xml, '<label text="a &quot;label&quot; &amp; more"></label>');
+};
+
+const testXML = function (t, xmlEntry) {
+    t.same(xmlEntry.json, null); // should be null or undefined
+    t.equal(xmlEntry.xml, '<block type="test_xmlBlock"></block>');
+};
+
+const testStyled = function (t, styled) {
+    t.equal(styled.json.type, 'test_styled');
+    t.equal(styled.json.hat, 'bowler');
+    // Each style adds its own extension, and none is added twice.
+    t.same(styled.json.extensions, ['shape_bowler_hat', 'style_minimalpadding', 'style_bigroundedcorners']);
+};
+
+const testSingleStyled = function (t, singleStyled) {
+    t.equal(singleStyled.json.type, 'test_singleStyled');
+    t.same(singleStyled.json.extensions, ['style_noroundedcorners', 'monitor_block']);
+};
+
 const testCommand = function (t, command) {
     t.equal(command.json.type, 'test_command');
     testCategoryInfo(t, command);
@@ -280,7 +327,8 @@ test('registerExtensionPrimitives', t => {
         });
 
         // Note that this also implicitly tests that block order is preserved
-        const [button, reporter, inlineImage, separator, command, conditional, loop] = blocksInfo;
+        const [button, reporter, inlineImage, separator, command, conditional, loop, label, xmlEntry, styled,
+            singleStyled] = blocksInfo;
 
         testButton(t, button);
         testReporter(t, reporter);
@@ -289,7 +337,28 @@ test('registerExtensionPrimitives', t => {
         testCommand(t, command);
         testConditional(t, conditional);
         testLoop(t, loop);
+        testLabel(t, label);
+        testXML(t, xmlEntry);
+        testStyled(t, styled);
+        testSingleStyled(t, singleStyled);
 
+        t.end();
+    });
+
+    runtime._registerExtensionPrimitives(testExtensionInfo);
+});
+
+test('getBlocksXML includes labels and XML entries in category order', t => {
+    const runtime = new Runtime();
+
+    runtime.on(Runtime.EXTENSION_ADDED, () => {
+        const categoryXML = runtime.getBlocksXML()[0].xml;
+        const labelIndex = categoryXML.indexOf('<label text="a &quot;label&quot; &amp; more"></label>');
+        const xmlIndex = categoryXML.indexOf('<block type="test_xmlBlock"></block>');
+
+        t.ok(labelIndex >= 0, 'Label XML should be present in the category');
+        t.ok(xmlIndex >= 0, 'XML entry should be present in the category');
+        t.ok(labelIndex < xmlIndex, 'Labels and XML entries should keep their declared order');
         t.end();
     });
 

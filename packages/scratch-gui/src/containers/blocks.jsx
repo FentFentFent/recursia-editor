@@ -279,38 +279,45 @@ class Blocks extends React.Component {
             });
     }
 
-    updateToolbox () {
+    updateToolbox() {
         this.toolboxUpdateTimeout = false;
 
-        const scale = this.workspace.getFlyout().getWorkspace().scale;
+        const flyout = this.workspace.getFlyout();
+
+        const scale = flyout.getWorkspace().scale;
         const selectedCategoryName = this.workspace
             .getToolbox()
             .getSelectedItem()
             .getName();
+
         const selectedCategoryScrollPosition =
-            this.workspace
-                .getFlyout()
-                .getCategoryScrollPosition(selectedCategoryName) * scale;
+            flyout.getCategoryScrollPosition(selectedCategoryName) * scale;
+
         const offsetWithinCategory =
-            this.workspace.getFlyout().getWorkspace()
-                .getMetrics().viewTop -
+            flyout.getWorkspace().getMetrics().viewTop -
             selectedCategoryScrollPosition;
 
+        // Prevent old flyout blocks from being recycled into the new toolbox.
+        flyout.setRecyclingEnabled(false);
+
         this.workspace.updateToolbox(this.props.toolboxXML);
+
         this.workspace.getToolbox().runAfterRerender(() => {
-            const newCategoryScrollPosition = this.workspace
-                .getFlyout()
+            const newCategoryScrollPosition = flyout
                 .getCategoryScrollPosition(selectedCategoryName);
+
             if (newCategoryScrollPosition) {
-                this.workspace
-                    .getFlyout()
-                    .getWorkspace()
-                    .scrollbar.setY(
-                        (newCategoryScrollPosition * scale) + offsetWithinCategory
-                    );
+                flyout.getWorkspace().scrollbar.setY(
+                    (newCategoryScrollPosition * scale) + offsetWithinCategory
+                );
             }
+
+            // Re-enable recycling after the new flyout has rendered.
+            flyout.setRecyclingEnabled(true);
         });
+
         this.workspace.getToolbox().forceRerender();
+
         this._renderedToolboxXML = this.props.toolboxXML;
 
         const queue = this.toolboxUpdateQueue;
@@ -374,12 +381,17 @@ class Blocks extends React.Component {
         });
     }
 
-    onTargetsUpdate () {
+    onTargetsUpdate() {
         if (this.props.vm.editingTarget && this.workspace.getFlyout()) {
-            ['glide', 'move', 'set'].forEach(prefix => {
-                this.updateToolboxBlockValue(`${prefix}x`, Math.round(this.props.vm.editingTarget.x).toString());
-                this.updateToolboxBlockValue(`${prefix}y`, Math.round(this.props.vm.editingTarget.y).toString());
+            ['glide','move','set'].forEach(prefix => {
+                this.updateToolboxBlockValue(`${ prefix }x`,Math.round(this.props.vm.editingTarget.x).toString());
+                this.updateToolboxBlockValue(`${ prefix }y`,Math.round(this.props.vm.editingTarget.y).toString());
             });
+        }
+
+        const toolboxXML = this.getToolboxXML();
+        if (toolboxXML) {
+            this.props.updateToolboxState(toolboxXML);
         }
     }
     onWorkspaceMetricsChange () {
@@ -429,11 +441,12 @@ class Blocks extends React.Component {
                 this.props.vm.runtime.getBlocksXML(target),
                 this.props.colorMode
             );
-            return makeToolboxXML(false, target.isStage, target.id, dynamicBlocksXML,
+            return makeToolboxXML(false,target.isStage,target.id,dynamicBlocksXML,
                 targetCostumes[targetCostumes.length - 1].name,
                 stageCostumes[stageCostumes.length - 1].name,
                 targetSounds.length > 0 ? targetSounds[targetSounds.length - 1].name : '',
-                getColorsForMode(this.props.colorMode)
+                getColorsForMode(this.props.colorMode),
+                this.props.vm
             );
         } catch {
             return null;

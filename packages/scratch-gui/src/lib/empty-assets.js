@@ -53,6 +53,7 @@ const emptySprite = (name, soundName, costumeName) => ({
     scale: 1,
     direction: 90,
     rotationStyle: 'normal',
+    dependencies: [],
     isDraggable: false,
     visible: true,
     spriteInfo: {}

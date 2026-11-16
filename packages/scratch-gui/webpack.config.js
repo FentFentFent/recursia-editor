@@ -51,7 +51,7 @@ const baseConfig = new ScratchWebpackConfigBuilder(
                 Buffer: require.resolve('buffer/'),
                 stream: require.resolve('stream-browserify')
             },
-            symlinks: false
+            symlinks: true
         }
     })
     .addModuleRule({
@@ -81,11 +81,11 @@ const baseConfig = new ScratchWebpackConfigBuilder(
     .addPlugin(new CopyWebpackPlugin({
         patterns: [
             {
-                from: '../../node_modules/scratch-blocks/media',
+                from: '../scratch-blocks/media',
                 to: 'static/blocks-media/default'
             },
             {
-                from: '../../node_modules/scratch-blocks/media',
+                from: '../scratch-blocks/media',
                 to: 'static/blocks-media/high-contrast'
             },
             {

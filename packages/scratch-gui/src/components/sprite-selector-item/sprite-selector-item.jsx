@@ -40,7 +40,8 @@ const SpriteSelectorItem = props => {
                     tabIndex={0}
                     aria-label={props.details ? `${props.name} (${props.details})` : props.name}
                     className={classNames(props.className, styles.spriteSelectorItem, {
-                        [styles.isSelected]: props.selected
+                        [styles.isSelected]: props.selected,
+                        [styles.setDependenciesMode]: props.setDependenciesMode
                     })}
                     onClick={props.onClick}
                     onKeyDown={handleKeyDown}
@@ -113,6 +114,15 @@ const SpriteSelectorItem = props => {
                                 />
                             </DangerousMenuItem>
                         )}
+                        {props.onSetDependenciesButtonClick && (
+                            <MenuItem onClick={props.onSetDependenciesButtonClick}>
+                                <FormattedMessage
+                                    defaultMessage="Select Imports"
+                                    description="Menu item to select or remove imports on the selected item."
+                                    id="gui.spriteSelectorItem.contextMenuDependencies"
+                                />
+                            </MenuItem>
+                        )}
                     </ContextMenu.Content>
                 </ContextMenu.Portal>
             )}
@@ -136,6 +146,7 @@ SpriteSelectorItem.propTypes = {
     onPointerLeave: PropTypes.func,
     preventContextMenu: PropTypes.bool,
     selected: PropTypes.bool.isRequired,
+    setDependenciesMode: PropTypes.bool,
     isDeleteConfirmationModalOpened: PropTypes.bool
 };
 

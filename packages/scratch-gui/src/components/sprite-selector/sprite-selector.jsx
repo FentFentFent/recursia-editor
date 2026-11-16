@@ -55,6 +55,8 @@ const SpriteSelectorComponent = function (props) {
         onDeleteSprite,
         onDuplicateSprite,
         onExportSprite,
+        onSetDependenciesSprite,
+        setDependenciesMode,
         onFileUploadClick,
         onNewSpriteClick,
         onPaintSpriteClick,
@@ -82,6 +84,8 @@ const SpriteSelectorComponent = function (props) {
         >
 
             <SpriteInfo
+                dependencies={selectedSprite.dependencies}
+                sprites={sprites}
                 direction={selectedSprite.direction}
                 disabled={spriteInfoDisabled}
                 name={selectedSprite.name}
@@ -110,6 +114,8 @@ const SpriteSelectorComponent = function (props) {
                 onDrop={onDrop}
                 onDuplicateSprite={onDuplicateSprite}
                 onExportSprite={onExportSprite}
+                onSetDependenciesSprite={onSetDependenciesSprite}
+                setDependenciesMode={setDependenciesMode}
                 onSelectSprite={onSelectSprite}
             />
             <ActionMenu
@@ -163,6 +169,8 @@ SpriteSelectorComponent.propTypes = {
     onDrop: PropTypes.func,
     onDuplicateSprite: PropTypes.func,
     onExportSprite: PropTypes.func,
+    onSetDependenciesSprite: PropTypes.func,
+    setDependenciesMode: PropTypes.bool,
     onFileUploadClick: PropTypes.func,
     onNewSpriteClick: PropTypes.func,
     onPaintSpriteClick: PropTypes.func,

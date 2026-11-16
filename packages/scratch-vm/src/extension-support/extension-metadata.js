@@ -13,10 +13,12 @@
 /**
  * @typedef {object} ExtensionBlockMetadata
  * All the metadata needed to register an extension block.
- * @property {string} opcode - a unique alphanumeric identifier for this block. No special characters allowed.
+ * @property {string} [opcode] - a unique alphanumeric identifier for this block. No special characters allowed.
  * @property {string} [func] - the name of the function implementing this block. Can be shared by other blocks/opcodes.
- * @property {BlockType} blockType - the type of block (command, reporter, etc.) being described.
- * @property {string} text - the text on the block, with [PLACEHOLDERS] for arguments.
+ * @property {BlockType} blockType - the type of block (command, reporter, label, etc.) being described.
+ * @property {string} [text] - the text on the block, with [PLACEHOLDERS] for arguments. For a LABEL entry, the
+ * text displayed on the label.
+ * @property {string} [xml] - for an XML entry, the Blockly XML inserted into the block palette.
  * @property {boolean} [hideFromPalette] - true if this block should not appear in the block palette.
  * @property {boolean} [isTerminal] - true if the block ends a stack - no blocks can be connected after it.
  * @property {boolean} [disableMonitor] - true if this block is a reporter but should not allow a monitor.
@@ -25,6 +27,7 @@
  * @property {boolean} [shouldRestartExistingThreads] - sets whether a hat/event block should restart existing threads.
  * @property {int} [branchCount] - for flow control blocks, the number of branches/substacks for this block.
  * @property {Object.<ExtensionArgumentMetadata>} [arguments] - map of argument placeholder to metadata about each arg.
+ * @property {StyleType|Array.<StyleType>} [style] - Visual styles applied to the block, if any.
  */
 
 /**

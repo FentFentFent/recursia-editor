@@ -205,6 +205,20 @@ const alerts = [
         maxDisplaySecs: 15
     },
     {
+        alertId: 'setDependencies',
+        alertType: AlertTypes.STANDARD,
+        clearList: [],
+        content: (
+            <FormattedMessage
+                defaultMessage="select the sprite to import, selected already imported sprites to remove their import"
+                description="Message indicating set dependencies mode"
+                id="gui.alerts.setDependencies"
+            />
+        ),
+        closeButton: true,
+        level: AlertLevels.INFO
+    },
+    {
         alertId: 'importingAsset',
         alertType: AlertTypes.STANDARD,
         clearList: [],

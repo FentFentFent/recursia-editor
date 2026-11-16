@@ -4,7 +4,8 @@ const ArgumentType = require('../extension-support/argument-type');
 const BlockType = require('../extension-support/block-type');
 const dispatch = require('../dispatch/worker-dispatch');
 const TargetType = require('../extension-support/target-type');
-
+const StyleShape = require('../extension-support/style-type');
+const styleType = require('../extension-support/style-type');
 class ExtensionWorker {
     constructor () {
         this.nextExtensionId = 0;
@@ -49,7 +50,7 @@ global.Scratch = global.Scratch || {};
 global.Scratch.ArgumentType = ArgumentType;
 global.Scratch.BlockType = BlockType;
 global.Scratch.TargetType = TargetType;
-
+global.Scratch.StyleShape = styleType;
 /**
  * Expose only specific parts of the worker to extensions.
  */

@@ -44,4 +44,4 @@ const ArgumentType = {
     IMAGE: 'image'
 };
 
-module.exports = ArgumentType;
+module.exports = Object.freeze(ArgumentType);

@@ -44,7 +44,16 @@ const BlockType = {
     /**
      * General reporter with numeric or string value
      */
-    REPORTER: 'reporter'
+    REPORTER: 'reporter',
+    /**
+     * A label displayed in the flyout itself (not an actual block)
+     */
+    LABEL: 'label', 
+
+    /**
+     * XML that is inserted into the flyout as a block.
+     */
+    XML: 'xml'
 };
 
-module.exports = BlockType;
+module.exports = Object.freeze(BlockType);

@@ -15,13 +15,15 @@ class CustomProcedures extends React.Component {
             'handleAddBoolean',
             'handleAddTextNumber',
             'handleToggleWarp',
+            'handleToggleReturns',
             'handleCancel',
             'handleOk',
             'setBlocks'
         ]);
         this.state = {
             rtlOffset: 0,
-            warp: false
+            warp: false,
+            returns: false
         };
     }
     componentWillUnmount () {
@@ -120,7 +122,7 @@ class CustomProcedures extends React.Component {
         this.mutationRoot.domToMutation(this.props.mutator);
         this.mutationRoot.initSvg();
         this.mutationRoot.render();
-        this.setState({warp: this.mutationRoot.getWarp()});
+        this.setState({warp: this.mutationRoot.getWarp(), returns: this.mutationRoot.getReturns()});
         // Allow the initial events to run to position this block, then focus.
         setTimeout(() => {
             this.mutationRoot.focusLastEditor_();
@@ -155,16 +157,25 @@ class CustomProcedures extends React.Component {
             this.setState({warp: newWarp});
         }
     }
+    handleToggleReturns () {
+        if (this.mutationRoot) {
+            const newReturns = !this.mutationRoot.getReturns();
+            this.mutationRoot.setReturns(newReturns);
+            this.setState({returns: newReturns});
+        }
+    }
     render () {
         return (
             <CustomProceduresComponent
                 componentRef={this.setBlocks}
+                doesReturn={this.state.returns}
                 warp={this.state.warp}
                 onAddBoolean={this.handleAddBoolean}
                 onAddLabel={this.handleAddLabel}
                 onAddTextNumber={this.handleAddTextNumber}
                 onCancel={this.handleCancel}
                 onOk={this.handleOk}
+                onToggleReturn={this.handleToggleReturns}
                 onToggleWarp={this.handleToggleWarp}
             />
         );
@@ -210,6 +221,7 @@ const mapStateToProps = state => ({
     mutator: state.scratchGui.customProcedures.mutator
 });
 
+export {CustomProcedures};
 export default connect(
     mapStateToProps
 )(CustomProcedures);

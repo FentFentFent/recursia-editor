@@ -2,6 +2,7 @@ const test = require('tap').test;
 const Worker = require('tiny-worker');
 
 const BlockType = require('../../src/extension-support/block-type');
+const StyleShape = require('../../src/extension-support/style-type');
 
 const dispatch = require('../../src/dispatch/central-dispatch');
 const VirtualMachine = require('../../src/virtual-machine');
@@ -100,20 +101,28 @@ test('load sync', t => {
 
     t.equal(vm.runtime._blockInfo.length, 1);
 
-    // blocks should be an array of two items: a button pseudo-block and a reporter block.
-    t.equal(vm.runtime._blockInfo[0].blocks.length, 3);
-    t.type(vm.runtime._blockInfo[0].blocks[0].info, 'object');
-    t.type(vm.runtime._blockInfo[0].blocks[0].info.func, 'MAKE_A_VARIABLE');
-    t.equal(vm.runtime._blockInfo[0].blocks[0].info.blockType, 'button');
-    t.type(vm.runtime._blockInfo[0].blocks[1].info, 'object');
-    t.equal(vm.runtime._blockInfo[0].blocks[1].info.opcode, 'exampleOpcode');
-    t.equal(vm.runtime._blockInfo[0].blocks[1].info.blockType, 'reporter');
-    t.type(vm.runtime._blockInfo[0].blocks[2].info, 'object');
-    t.equal(vm.runtime._blockInfo[0].blocks[2].info.opcode, 'exampleWithInlineImage');
-    t.equal(vm.runtime._blockInfo[0].blocks[2].info.blockType, 'command');
+    const blocks = vm.runtime._blockInfo[0].blocks;
+    const findBlock = opcode => blocks.find(block => block.info.opcode === opcode);
+
+    // The first palette entry is the "make a variable" button.
+    t.type(blocks[0].info, 'object');
+    t.type(blocks[0].info.func, 'MAKE_A_VARIABLE');
+    t.equal(blocks[0].info.blockType, 'button');
+
+    const reporter = findBlock('exampleOpcode');
+    t.equal(reporter.info.blockType, 'reporter');
+    const inlineImage = findBlock('exampleWithInlineImage');
+    t.equal(inlineImage.info.blockType, 'command');
+
+    // Every style should be demonstrated by at least one palette block.
+    const demonstratedStyles = new Set(
+        blocks.filter(block => block.json).map(block => block.info.style));
+    for (const style of Object.values(StyleShape)) {
+        t.ok(demonstratedStyles.has(style), `palette should demonstrate ${String(style)}`);
+    }
 
     // Test the opcode function
-    t.equal(vm.runtime._blockInfo[0].blocks[1].info.func(), 'no stage yet');
+    t.equal(reporter.info.func(), 'no stage yet');
 
     const sprite = new Sprite(null, vm.runtime);
     sprite.name = 'Stage';
@@ -121,7 +130,7 @@ test('load sync', t => {
     stage.isStage = true;
     vm.runtime.targets = [stage];
 
-    t.equal(vm.runtime._blockInfo[0].blocks[1].info.func(), 'Stage');
+    t.equal(reporter.info.func(), 'Stage');
 
     t.end();
 });

@@ -33,6 +33,11 @@
     background: $ui-white;
 }
 
+.sprite-selector-item.set-dependencies-mode:hover {
+    border: 2px solid $motion-primary;
+    background: $drop-highlight;
+}
+
 .sprite-selector-item:hover .sprite-image, .is-selected .sprite-image {
     filter: drop-shadow(0px 0px 2px  $ui-black-transparent);
 }

@@ -50,6 +50,8 @@ class SpriteInfo extends React.Component {
             this.props.name !== nextProps.name ||
             this.props.stageSize !== nextProps.stageSize ||
             this.props.visible !== nextProps.visible ||
+            JSON.stringify(this.props.dependencies) !== JSON.stringify(nextProps.dependencies) ||
+            JSON.stringify(this.props.sprites) !== JSON.stringify(nextProps.sprites) ||
             // Only update these if rounded value has changed
             Math.round(this.props.direction) !== Math.round(nextProps.direction) ||
             Math.round(this.props.size) !== Math.round(nextProps.size) ||
@@ -61,6 +63,17 @@ class SpriteInfo extends React.Component {
         const {
             stageSize
         } = this.props;
+
+        const sprites = this.props.sprites || this.props.targets || {};
+        const dependencyNames = (this.props.dependencies || []).map(dep => {
+            if (typeof dep === 'string') {
+                return (sprites[dep] && sprites[dep].name) ? sprites[dep].name : dep;
+            }
+            if (dep && typeof dep === 'object') {
+                return dep.name || dep.id || String(dep);
+            }
+            return String(dep);
+        });
 
         const sprite = (
             <FormattedMessage
@@ -169,6 +182,12 @@ class SpriteInfo extends React.Component {
                         {xPosition}
                         {yPosition}
                     </div>
+                    {dependencyNames.length > 0 ? (
+                        <div className={styles.dependenciesRow}>
+                            <Label secondary text="Imports:" />
+                            <span className={styles.dependenciesPill}>{dependencyNames.join(', ')}</span>
+                        </div>
+                    ) : null}
                 </Box>
             );
         }
@@ -243,12 +262,23 @@ class SpriteInfo extends React.Component {
                         />
                     </div>
                 </div>
+                {dependencyNames.length > 0 ? (
+                    <div className={styles.dependenciesRow}>
+                                                <Label secondary text="Imports:" />
+                            <span className={styles.dependenciesPill}>{dependencyNames.join(', ')}</span>
+                    </div>
+                ) : null}
             </Box>
         );
     }
 }
 
 SpriteInfo.propTypes = {
+    // Dependencies for this sprite (populated from the VM target's toJSON).
+    dependencies: PropTypes.any,
+    // Map of targets/sprites keyed by id, used to resolve dependency ids to names.
+    sprites: PropTypes.object,
+    targets: PropTypes.object,
     direction: PropTypes.oneOfType([
         PropTypes.string,
         PropTypes.number

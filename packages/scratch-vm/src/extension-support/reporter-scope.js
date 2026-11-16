@@ -15,4 +15,4 @@ const ReporterScope = {
     TARGET: 'target'
 };
 
-module.exports = ReporterScope;
+module.exports = Object.freeze(ReporterScope);

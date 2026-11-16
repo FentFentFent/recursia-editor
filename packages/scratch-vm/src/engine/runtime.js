@@ -31,6 +31,9 @@ const Video = require('../io/video');
 
 const StringUtil = require('../util/string-util');
 const uid = require('../util/uid');
+const styleType = require('../extension-support/style-type.js');
+const TargetPreprocesser = require('./target-preprocessor.js');
+const RenderedTarget = require('../sprites/rendered-target.js');
 
 /**
  * @import {ScratchStorage} from '@scratch/scratch-storage'
@@ -45,7 +48,8 @@ const defaultBlockPackages = {
     scratch3_sound: require('../blocks/scratch3_sound'),
     scratch3_sensing: require('../blocks/scratch3_sensing'),
     scratch3_data: require('../blocks/scratch3_data'),
-    scratch3_procedures: require('../blocks/scratch3_procedures')
+    scratch3_procedures: require('../blocks/scratch3_procedures'),
+    recursia1_modules: require('../blocks/recursia1_modules')
 };
 
 const defaultExtensionColors = ['#0FBD8C', '#0DA57A', '#0B8E69'];
@@ -409,7 +413,17 @@ class Runtime extends EventEmitter {
         this._initScratchLink();
 
         this.resetRunId();
+
+
+
+
+        /**
+         * Collects the blocks that a target exports to the targets depending on it.
+         */
+        this.preprocessor = new TargetPreprocesser(this);
     }
+
+
 
     /**
      * Width of the stage, in pixels.
@@ -742,6 +756,16 @@ class Runtime extends EventEmitter {
     // -----------------------------------------------------------------------------
     // -----------------------------------------------------------------------------
 
+
+    /**
+     * Get the blocks a target exports for the flyout of targets depending on it.
+     * @param {RenderedTarget} target The target to read exports from.
+     * @returns {?Blocks} The exported blocks, or null if the target exports none.
+     */
+    getExportsForTarget (target) {
+        return this.preprocessor.getExports(target);
+    }
+
     // Helper function for initializing the addCloudVariable function
     _initializeAddCloudVariable (newCloudDataManager) {
         // The addCloudVariable function
@@ -1068,6 +1092,14 @@ class Runtime extends EventEmitter {
             return this._convertButtonForScratchBlocks(blockInfo);
         }
 
+        if (blockInfo.blockType === BlockType.LABEL) {
+            return this._convertLabelForScratchBlocks(blockInfo);
+        }
+
+        if (blockInfo.blockType === BlockType.XML) {
+            return this._convertXMLForScratchBlocks(blockInfo);
+        }
+
         return this._convertBlockForScratchBlocks(blockInfo, categoryInfo);
     }
 
@@ -1160,6 +1192,49 @@ class Runtime extends EventEmitter {
             break;
         }
 
+        // Parse the style attribute. Styles are independent, so a block can
+        // combine several of them.
+        if (blockInfo.style) {
+            const styles = Array.isArray(blockInfo.style) ? blockInfo.style : [blockInfo.style];
+            const addExtension = extension => {
+                if (!blockJSON.extensions.includes(extension)) {
+                    blockJSON.extensions.push(extension);
+                }
+            };
+            for (const style of styles) {
+                switch (style) {
+                case styleType.BowlerHat:
+                    blockJSON.hat = 'bowler';
+                    addExtension('shape_bowler_hat');
+                    break;
+                case styleType.ClassicalHat:
+                    addExtension('shape_hat');
+                    break;
+                case styleType.ExtraPadded:
+                    addExtension('style_extrapadded');
+                    break;
+                case styleType.MinimalPadding:
+                    addExtension('style_minimalpadding');
+                    break;
+                case styleType.NoRoundedCorners:
+                    addExtension('style_noroundedcorners');
+                    break;
+                case styleType.SmallRoundedCorners:
+                    addExtension('style_smallroundedcorners');
+                    break;
+                case styleType.MediumRoundedCorners:
+                    addExtension('style_mediumroundedcorners');
+                    break;
+                case styleType.BigRoundedCorners:
+                    addExtension('style_bigroundedcorners');
+                    break;
+                case styleType.ExtremeRoundedCorners:
+                    addExtension('style_extremeroundedcorners');
+                    break;
+                }
+            }
+        }
+
         const blockText = Array.isArray(blockInfo.text) ? blockInfo.text : [blockInfo.text];
         let inTextNum = 0; // text for the next block "arm" is blockText[inTextNum]
         let inBranchNum = 0; // how many branches have we placed into the JSON so far?
@@ -1233,6 +1308,37 @@ class Runtime extends EventEmitter {
         return {
             info: blockInfo,
             xml: '<sep gap="36"/>'
+        };
+    }
+
+    /**
+     * Convert a label for scratch-blocks. A label has no opcode: its text is displayed directly in the flyout.
+     * @param {ExtensionBlockMetadata} labelInfo - the label to convert
+     * @property {string} text - the text to display on the label
+     * @returns {ConvertedBlockInfo} - the converted & original label information
+     * @private
+     */
+    _convertLabelForScratchBlocks (labelInfo) {
+        const extensionMessageContext = this.makeMessageContextForTarget();
+        const labelText = xmlEscape(maybeFormatMessage(labelInfo.text, extensionMessageContext));
+        return {
+            info: labelInfo,
+            xml: `<label text="${labelText}"></label>`
+        };
+    }
+
+    /**
+     * Convert an XML entry for scratch-blocks. An XML entry has no opcode: its `xml` is inserted into the flyout
+     * as-is, which lets an extension place arbitrary Blockly XML (such as several blocks) in its palette.
+     * @param {ExtensionBlockMetadata} xmlInfo - the entry to convert
+     * @property {string} xml - valid Blockly XML
+     * @returns {ConvertedBlockInfo} - the converted & original XML information
+     * @private
+     */
+    _convertXMLForScratchBlocks (xmlInfo) {
+        return {
+            info: xmlInfo,
+            xml: xmlInfo.xml
         };
     }
 

@@ -96,6 +96,15 @@ class Blocks {
         this.forceNoGlow = optNoGlow || false;
     }
 
+
+
+    /**
+     * Get all blocks as a list, mainly for flyout applications
+     * @returns {object[]}
+     */
+    getBlocksList() {
+        return Object.values(this._blocks);
+    }
     /**
      * Blockly inputs that represent statements/branch.
      * are prefixed with this string.
@@ -292,6 +301,8 @@ class Blocks {
     }
     // ---------------------------------------------------------------------
 
+
+
     /**
      * Create event listener for blocks, variables, and comments. Handles validation and
      * serves as a generic adapter between the blocks, variables, and the
@@ -324,241 +335,240 @@ class Blocks {
 
         // Block create/update/destroy
         switch (e.type) {
-        case 'create': {
-            const newBlocks = adapter(e);
-            // A create event can create many blocks. Add them all.
-            for (let i = 0; i < newBlocks.length; i++) {
-                this.createBlock(newBlocks[i]);
-            }
-            break;
-        }
-        case 'change':
-            this.changeBlock({
-                id: e.blockId,
-                element: e.element,
-                name: e.name,
-                value: e.newValue
-            });
-            break;
-        case 'move':
-            this.moveBlock({
-                id: e.blockId,
-                oldParent: e.oldParentId,
-                oldInput: e.oldInputName,
-                newParent: e.newParentId,
-                newInput: e.newInputName,
-                newCoordinate: e.newCoordinate
-            });
-            break;
-        case 'dragOutside':
-            this.runtime.emitBlockDragUpdate(e.isOutside);
-            break;
-        case 'endDrag':
-            this.runtime.emitBlockDragUpdate(false /* areBlocksOverGui */);
-
-            // Drag blocks onto another sprite
-            if (e.isOutside) {
+            case 'create': {
                 const newBlocks = adapter(e);
-                this.runtime.emitBlockEndDrag(newBlocks, e.blockId);
+                // A create event can create many blocks. Add them all.
+                for (let i = 0; i < newBlocks.length; i++) {
+                    this.createBlock(newBlocks[i]);
+                }
+                break;
             }
-            break;
-        case 'delete':
-            // Don't accept delete events for missing blocks,
-            // or shadow blocks being obscured.
-            if (!Object.prototype.hasOwnProperty.call(this._blocks, e.blockId) ||
-                this._blocks[e.blockId].shadow) {
-                return;
-            }
-            // Inform any runtime to forget about glows on this script.
-            if (this._blocks[e.blockId].topLevel) {
-                this.runtime.quietGlow(e.blockId);
-            }
-            this.deleteBlock(e.blockId);
-            break;
-        case 'var_create':
-            // Check if the variable being created is global or local
-            // If local, create a local var on the current editing target, as long
-            // as there are no conflicts, and the current target is actually a sprite
-            // If global or if the editing target is not present or we somehow got
-            // into a state where a local var was requested for the stage,
-            // create a stage (global) var after checking for name conflicts
-            // on all the sprites.
-            if (e.isLocal && editingTarget && !editingTarget.isStage && !e.isCloud) {
-                if (!editingTarget.lookupVariableById(e.varId)) {
-                    editingTarget.createVariable(e.varId, e.varName, e.varType);
+            case 'change':
+                this.changeBlock({
+                    id: e.blockId,
+                    element: e.element,
+                    name: e.name,
+                    value: e.newValue
+                });
+                break;
+            case 'move':
+                this.moveBlock({
+                    id: e.blockId,
+                    oldParent: e.oldParentId,
+                    oldInput: e.oldInputName,
+                    newParent: e.newParentId,
+                    newInput: e.newInputName,
+                    newCoordinate: e.newCoordinate
+                });
+                break;
+            case 'dragOutside':
+                this.runtime.emitBlockDragUpdate(e.isOutside);
+                break;
+            case 'endDrag':
+                this.runtime.emitBlockDragUpdate(false /* areBlocksOverGui */);
+
+                // Drag blocks onto another sprite
+                if (e.isOutside) {
+                    const newBlocks = adapter(e);
+                    this.runtime.emitBlockEndDrag(newBlocks,e.blockId);
+                }
+                break;
+            case 'delete':
+                // Don't accept delete events for missing blocks,
+                // or shadow blocks being obscured.
+                if (!Object.prototype.hasOwnProperty.call(this._blocks,e.blockId) ||
+                    this._blocks[e.blockId].shadow) {
+                    return;
+                }
+                // Inform any runtime to forget about glows on this script.
+                if (this._blocks[e.blockId].topLevel) {
+                    this.runtime.quietGlow(e.blockId);
+                }
+                this.deleteBlock(e.blockId);
+                break;
+            case 'var_create':
+                // Check if the variable being created is global or local
+                // If local, create a local var on the current editing target, as long
+                // as there are no conflicts, and the current target is actually a sprite
+                // If global or if the editing target is not present or we somehow got
+                // into a state where a local var was requested for the stage,
+                // create a stage (global) var after checking for name conflicts
+                // on all the sprites.
+                if (e.isLocal && editingTarget && !editingTarget.isStage && !e.isCloud) {
+                    if (!editingTarget.lookupVariableById(e.varId)) {
+                        editingTarget.createVariable(e.varId,e.varName,e.varType);
+                        this.emitProjectChanged();
+                    }
+                } else {
+                    if (stage.lookupVariableById(e.varId)) {
+                        // Do not re-create a variable if it already exists
+                        return;
+                    }
+                    // Check for name conflicts in all of the targets
+                    const allTargets = this.runtime.targets.filter(t => t.isOriginal);
+                    for (const target of allTargets) {
+                        if (target.lookupVariableByNameAndType(e.varName,e.varType,true)) {
+                            return;
+                        }
+                    }
+                    stage.createVariable(e.varId,e.varName,e.varType,e.isCloud);
                     this.emitProjectChanged();
                 }
-            } else {
-                if (stage.lookupVariableById(e.varId)) {
-                    // Do not re-create a variable if it already exists
-                    return;
-                }
-                // Check for name conflicts in all of the targets
-                const allTargets = this.runtime.targets.filter(t => t.isOriginal);
-                for (const target of allTargets) {
-                    if (target.lookupVariableByNameAndType(e.varName, e.varType, true)) {
-                        return;
+                break;
+            case 'var_rename':
+                if (editingTarget && Object.prototype.hasOwnProperty.call(editingTarget.variables,e.varId)) {
+                    // This is a local variable, rename on the current target
+                    editingTarget.renameVariable(e.varId,e.newName);
+                    // Update all the blocks on the current target that use
+                    // this variable
+                    editingTarget.blocks.updateBlocksAfterVarRename(e.varId,e.newName);
+                } else {
+                    // This is a global variable
+                    stage.renameVariable(e.varId,e.newName);
+                    // Update all blocks on all targets that use the renamed variable
+                    const targets = this.runtime.targets;
+                    for (let i = 0; i < targets.length; i++) {
+                        const currTarget = targets[i];
+                        currTarget.blocks.updateBlocksAfterVarRename(e.varId,e.newName);
                     }
                 }
-                stage.createVariable(e.varId, e.varName, e.varType, e.isCloud);
                 this.emitProjectChanged();
+                break;
+            case 'var_delete': {
+                const target = (editingTarget && Object.prototype.hasOwnProperty.call(editingTarget.variables,e.varId)) ?
+                    editingTarget : stage;
+                target.deleteVariable(e.varId);
+                this.emitProjectChanged();
+                break;
             }
-            break;
-        case 'var_rename':
-            if (editingTarget && Object.prototype.hasOwnProperty.call(editingTarget.variables, e.varId)) {
-                // This is a local variable, rename on the current target
-                editingTarget.renameVariable(e.varId, e.newName);
-                // Update all the blocks on the current target that use
-                // this variable
-                editingTarget.blocks.updateBlocksAfterVarRename(e.varId, e.newName);
-            } else {
-                // This is a global variable
-                stage.renameVariable(e.varId, e.newName);
-                // Update all blocks on all targets that use the renamed variable
-                const targets = this.runtime.targets;
-                for (let i = 0; i < targets.length; i++) {
-                    const currTarget = targets[i];
-                    currTarget.blocks.updateBlocksAfterVarRename(e.varId, e.newName);
-                }
-            }
-            this.emitProjectChanged();
-            break;
-        case 'var_delete': {
-            const target = (editingTarget && Object.prototype.hasOwnProperty.call(editingTarget.variables, e.varId)) ?
-                editingTarget : stage;
-            target.deleteVariable(e.varId);
-            this.emitProjectChanged();
-            break;
-        }
-        case 'block_comment_create':
-        case 'comment_create':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                currTarget.createComment(e.commentId, e.blockId, '',
-                    e.json.x, e.json.y, e.json.width, e.json.height, false);
+            case 'block_comment_create':
+            case 'comment_create':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    currTarget.createComment(e.commentId,e.blockId,'',
+                        e.json.x,e.json.y,e.json.width,e.json.height,false);
 
-                if (currTarget.comments[e.commentId].x === null &&
-                    currTarget.comments[e.commentId].y === null) {
-                    // Block comments imported from 2.0 projects are imported with their
-                    // x and y coordinates set to null so that scratch-blocks can
-                    // auto-position them. If we are receiving a create event for these
-                    // comments, then the auto positioning should have taken place.
-                    // Update the x and y position of these comments to match the
-                    // one from the event.
-                    currTarget.comments[e.commentId].x = e.json.x;
-                    currTarget.comments[e.commentId].y = e.json.y;
+                    if (currTarget.comments[e.commentId].x === null &&
+                        currTarget.comments[e.commentId].y === null) {
+                        // Block comments imported from 2.0 projects are imported with their
+                        // x and y coordinates set to null so that scratch-blocks can
+                        // auto-position them. If we are receiving a create event for these
+                        // comments, then the auto positioning should have taken place.
+                        // Update the x and y position of these comments to match the
+                        // one from the event.
+                        currTarget.comments[e.commentId].x = e.json.x;
+                        currTarget.comments[e.commentId].y = e.json.y;
+                    }
                 }
-            }
-            this.emitProjectChanged();
-            break;
-        case 'block_comment_change':
-        case 'comment_change':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                if (!Object.prototype.hasOwnProperty.call(currTarget.comments, e.commentId)) {
-                    log.warn(`Cannot change comment with id ${e.commentId} because it does not exist.`);
-                    return;
-                }
-                const comment = currTarget.comments[e.commentId];
-                comment.text = e.newContents_;
                 this.emitProjectChanged();
-            }
-            break;
-        case 'block_comment_move':
-        case 'comment_move':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                if (currTarget && !Object.prototype.hasOwnProperty.call(currTarget.comments, e.commentId)) {
-                    log.warn(`Cannot move comment with id ${e.commentId} because it does not exist.`);
-                    return;
+                break;
+            case 'block_comment_change':
+            case 'comment_change':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    if (!Object.prototype.hasOwnProperty.call(currTarget.comments,e.commentId)) {
+                        log.warn(`Cannot change comment with id ${ e.commentId } because it does not exist.`);
+                        return;
+                    }
+                    const comment = currTarget.comments[e.commentId];
+                    comment.text = e.newContents_;
+                    this.emitProjectChanged();
                 }
-                const comment = currTarget.comments[e.commentId];
-                const newCoord = e.newCoordinate_;
-                comment.x = newCoord.x;
-                comment.y = newCoord.y;
+                break;
+            case 'block_comment_move':
+            case 'comment_move':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    if (currTarget && !Object.prototype.hasOwnProperty.call(currTarget.comments,e.commentId)) {
+                        log.warn(`Cannot move comment with id ${ e.commentId } because it does not exist.`);
+                        return;
+                    }
+                    const comment = currTarget.comments[e.commentId];
+                    const newCoord = e.newCoordinate_;
+                    comment.x = newCoord.x;
+                    comment.y = newCoord.y;
 
-                this.emitProjectChanged();
-            }
-            break;
-        case 'block_comment_collapse':
-        case 'comment_collapse':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                if (
-                    currTarget &&
+                    this.emitProjectChanged();
+                }
+                break;
+            case 'block_comment_collapse':
+            case 'comment_collapse':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    if (
+                        currTarget &&
                         !Object.prototype.hasOwnProperty.call(
                             currTarget.comments,
                             e.commentId
                         )
-                ) {
-                    log.warn(
-                        `Cannot collapse comment with id ${e.commentId} because it does not exist.`
-                    );
-                    return;
+                    ) {
+                        log.warn(
+                            `Cannot collapse comment with id ${ e.commentId } because it does not exist.`
+                        );
+                        return;
+                    }
+                    const comment = currTarget.comments[e.commentId];
+                    comment.minimized = e.newCollapsed;
+                    this.emitProjectChanged();
                 }
-                const comment = currTarget.comments[e.commentId];
-                comment.minimized = e.newCollapsed;
-                this.emitProjectChanged();
-            }
-            break;
-        case 'block_comment_resize':
-        case 'comment_resize':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                if (
-                    currTarget &&
+                break;
+            case 'block_comment_resize':
+            case 'comment_resize':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    if (
+                        currTarget &&
                         !Object.prototype.hasOwnProperty.call(
                             currTarget.comments,
                             e.commentId
                         )
-                ) {
-                    log.warn(
-                        `Cannot resize comment with id ${e.commentId} because it does not exist.`
-                    );
-                    return;
-                }
-                const comment = currTarget.comments[e.commentId];
-                comment.width = e.newSize.width;
-                comment.height = e.newSize.height;
-                this.emitProjectChanged();
-            }
-            break;
-        case 'block_comment_delete':
-        case 'comment_delete':
-            if (this.runtime.getEditingTarget()) {
-                const currTarget = this.runtime.getEditingTarget();
-                if (!Object.prototype.hasOwnProperty.call(currTarget.comments, e.commentId)) {
-                    // If we're in this state, we have probably received
-                    // a delete event from a workspace that we switched from
-                    // (e.g. a delete event for a comment on sprite a's workspace
-                    // when switching from sprite a to sprite b)
-                    return;
-                }
-                delete currTarget.comments[e.commentId];
-                if (e.blockId) {
-                    const block = currTarget.blocks.getBlock(e.blockId);
-                    if (!block) {
-                        log.warn(`Could not find block referenced by comment with id: ${e.commentId}`);
+                    ) {
+                        log.warn(
+                            `Cannot resize comment with id ${ e.commentId } because it does not exist.`
+                        );
                         return;
                     }
-                    delete block.comment;
+                    const comment = currTarget.comments[e.commentId];
+                    comment.width = e.newSize.width;
+                    comment.height = e.newSize.height;
+                    this.emitProjectChanged();
                 }
+                break;
+            case 'block_comment_delete':
+            case 'comment_delete':
+                if (this.runtime.getEditingTarget()) {
+                    const currTarget = this.runtime.getEditingTarget();
+                    if (!Object.prototype.hasOwnProperty.call(currTarget.comments,e.commentId)) {
+                        // If we're in this state, we have probably received
+                        // a delete event from a workspace that we switched from
+                        // (e.g. a delete event for a comment on sprite a's workspace
+                        // when switching from sprite a to sprite b)
+                        return;
+                    }
+                    delete currTarget.comments[e.commentId];
+                    if (e.blockId) {
+                        const block = currTarget.blocks.getBlock(e.blockId);
+                        if (!block) {
+                            log.warn(`Could not find block referenced by comment with id: ${ e.commentId }`);
+                            return;
+                        }
+                        delete block.comment;
+                    }
 
-                this.emitProjectChanged();
-            }
-            break;
-        case 'click':
-            // UI event: clicked scripts toggle in the runtime.
-            if (e.targetType === 'block') {
-                this.runtime.toggleScript(
-                    this.getTopLevelScript(e.blockId),
-                    {stackClick: true}
-                );
-            }
-            break;
+                    this.emitProjectChanged();
+                }
+                break;
+            case 'click':
+                // UI event: clicked scripts toggle in the runtime.
+                if (e.targetType === 'block') {
+                    this.runtime.toggleScript(
+                        this.getTopLevelScript(e.blockId),
+                        { stackClick: true }
+                    );
+                }
+                break;
         }
     }
-
     // ---------------------------------------------------------------------
 
     /**
@@ -1135,7 +1145,6 @@ class Blocks {
     toXML (comments) {
         return this._scripts.map(script => this.blockToXML(script, comments)).join();
     }
-
     /**
      * Recursively encode an individual block and its children
      * into a Blockly/scratch-blocks XML string.

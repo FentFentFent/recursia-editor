@@ -129,7 +129,7 @@ class GUI extends React.Component {
             ...componentProps
         } = this.props;
 
-
+        
         return (
             <GUIComponent
                 loading={fetchingProject || isLoading || loadingStateVisible}

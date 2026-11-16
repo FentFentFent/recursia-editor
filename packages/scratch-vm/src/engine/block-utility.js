@@ -147,6 +147,14 @@ class BlockUtility {
     }
 
     /**
+     * Return a value from the procedure running on this thread.
+     * @param {*} value Value the calling block should report.
+     */
+    returnFromProcedure (value) {
+        this.sequencer.returnFromProcedure(this.thread, value);
+    }
+
+    /**
      * Start a specified procedure on this thread.
      * @param {string} procedureCode Procedure code for procedure to start.
      */
@@ -155,12 +163,22 @@ class BlockUtility {
     }
 
     /**
+     * Start a procedure that reports a value back to the calling block.
+     * @param {string} procedureCode Procedure code for the procedure to start.
+     * @returns {?object} Thenable for the value the procedure returns, or null
+     *     if the procedure could not be found.
+     */
+    startProcedureReturning (procedureCode) {
+        return this.sequencer.stepToReturningProcedure(this.thread, procedureCode);
+    }
+
+    /**
      * Get names and ids of parameters for the given procedure.
      * @param {string} procedureCode Procedure code for procedure to query.
      * @returns {Array.<string>} List of param names for a procedure.
      */
     getProcedureParamNamesAndIds (procedureCode) {
-        return this.thread.target.blocks.getProcedureParamNamesAndIds(procedureCode);
+        return this.thread.target.getProcedureParamNamesAndIds(procedureCode);
     }
 
     /**
@@ -169,7 +187,7 @@ class BlockUtility {
      * @returns {Array.<string>} List of param names for a procedure.
      */
     getProcedureParamNamesIdsAndDefaults (procedureCode) {
-        return this.thread.target.blocks.getProcedureParamNamesIdsAndDefaults(procedureCode);
+        return this.thread.target.getProcedureParamNamesIdsAndDefaults(procedureCode);
     }
 
     /**
