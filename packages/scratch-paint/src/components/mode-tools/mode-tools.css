@@ -14,12 +14,12 @@
 }
 
 [dir="ltr"] .mod-dashed-border {
-    border-right: 1px dashed $ui-pane-border;
+    border-right: 1px dashed var(--paint-ui-pane-border);
     padding-right: calc(3 * $grid-unit);
 }
 
 [dir="rtl"] .mod-dashed-border {
-    border-left: 1px dashed $ui-pane-border;
+    border-left: 1px dashed var(--paint-ui-pane-border);
     padding-left: calc(3 * $grid-unit);
 }
 

@@ -1,5 +1,4 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 
 /* @todo: refactor this class name, and component: `sprite-selector` to `sprite` */
 .sprite-selector-item {
@@ -10,10 +9,10 @@
 
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 0.8rem;
-    color: $text-primary;
+    color: var(--text-primary);
     border-width: 2px;
     border-style: solid;
-    border-color: $ui-black-transparent;
+    border-color: var(--ui-black-transparent);
     border-radius: $space;
 
     text-align: center;
@@ -23,23 +22,23 @@
 }
 
 .sprite-selector-item.is-selected {
-    box-shadow: 0px 0px 0px 4px $looks-transparent;
-    border: 2px solid $looks-secondary;
-    background: $ui-white;
+    box-shadow: 0px 0px 0px 4px var(--looks-transparent);
+    border: 2px solid var(--looks-secondary);
+    background: var(--ui-surface);
 }
 
 .sprite-selector-item:hover {
-    border: 2px solid $looks-secondary;
-    background: $ui-white;
+    border: 2px solid var(--looks-secondary);
+    background: var(--ui-surface);
 }
 
 .sprite-selector-item.set-dependencies-mode:hover {
-    border: 2px solid $motion-primary;
-    background: $drop-highlight;
+    border: 2px solid var(--motion-primary);
+    background: var(--drop-highlight);
 }
 
 .sprite-selector-item:hover .sprite-image, .is-selected .sprite-image {
-    filter: drop-shadow(0px 0px 2px  $ui-black-transparent);
+    filter: drop-shadow(0px 0px 2px  var(--ui-shadow));
 }
 
 /* Outer/Inner chicanery is to prevent layouts when sprite image changes */
@@ -72,7 +71,7 @@ body .sprite-image {
     border-bottom-right-radius: 0.25rem;
 
     font-size: 0.625rem;
-    color: $text-primary;
+    color: var(--text-primary);
     user-select: none;
 }
 
@@ -93,8 +92,8 @@ body .sprite-image {
 }
 
 .is-selected .sprite-info {
-    background: $looks-secondary;
-    color: $ui-white;
+    background: var(--looks-secondary);
+    color: var(--ui-white);
 }
 
 .delete-button {

@@ -1,12 +1,11 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 
 .library-scroll-grid {
     display: flex;
     justify-content: flex-start;
     align-content: flex-start;
     align-items: flex-start;
-    background: $ui-secondary;
+    background: var(--ui-secondary);
     flex-grow: 1;
     flex-wrap: wrap;
     overflow-y: auto;
@@ -28,7 +27,7 @@
   padding-Left: .5rem;
   font-weight: bold;
   font-size: 2rem;
-  color: $text-primary;
+  color: var(--text-primary);
 }
 
 .library-category-items {
@@ -42,7 +41,7 @@
     flex-direction: row;
     justify-content: flex-start;
     align-items: center;
-    background-color: $looks-transparent;
+    background-color: var(--looks-transparent);
     padding: 1rem;
     font-size: .875rem;
 }
@@ -86,5 +85,5 @@
 }
 
 .membership-tag {
-    background-color: $membership-blue;
+    background-color: var(--membership-blue);
 }

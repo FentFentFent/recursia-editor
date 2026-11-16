@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 @import "../../css/units.css";
 
 .editor-container {
@@ -37,19 +36,19 @@
 
 [dir="ltr"] .input-group {
     padding-right: calc(2 * $space);
-    border-right: 1px dashed $ui-black-transparent;
+    border-right: 1px dashed var(--ui-black-transparent);
 }
 
 [dir="rtl"] .input-group {
     padding-left: calc(2 * $space);
-    border-left: 1px dashed $ui-black-transparent;
+    border-left: 1px dashed var(--ui-black-transparent);
 }
 
 [dir="rtl"] .row-reverse > .input-group {
     padding-left: 0;
     padding-right: calc(2 * $space);
     border-left: none;
-    border-right: 1px dashed $ui-black-transparent;
+    border-right: 1px dashed var(--ui-black-transparent);
 }
 
 .waveform-container {
@@ -61,7 +60,7 @@
     position: relative;
 
     background: hsla(300, 53%, 60%, 0.15);
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     border-radius: 5px;
 
     margin-top: 20px;
@@ -74,9 +73,9 @@ $border-radius: 0.25rem;
     height: 2rem;
     padding: 0.35rem;
     outline: none;
-    background: white;
+    background: var(--ui-surface);
     border-radius: $border-radius;
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     cursor: pointer;
     font-size: 0.85rem;
     user-select: none;
@@ -85,7 +84,7 @@ $border-radius: 0.25rem;
 }
 
 .button:active {
-    background: $looks-transparent;
+    background: var(--looks-transparent);
 }
 
 .button:focus::before {
@@ -95,7 +94,7 @@ $border-radius: 0.25rem;
     right: -1px;
     bottom: -1px;
     left: -1px;
-    border: 1px solid $looks-secondary;
+    border: 1px solid var(--looks-secondary);
     z-index: 1;
 }
 
@@ -109,9 +108,9 @@ $border-radius: 0.25rem;
 .round-button {
     height: 3rem;
     width: 3rem;
-    background: $looks-secondary;
+    background: var(--looks-secondary);
     border-radius: 100%;
-    border: 4px solid $ui-white-dim;
+    border: 4px solid var(--ui-white-dim);
     cursor: pointer;
     padding: 0.75rem;
     user-select: none;
@@ -131,7 +130,7 @@ $border-radius: 0.25rem;
 .trim-button {
     display: flex;
     align-items: center;
-    color: $text-primary;
+    color: var(--text-primary);
     font-size: 0.625rem;
     user-select: none;
 
@@ -151,7 +150,7 @@ $border-radius: 0.25rem;
 
 .effect-button {
     flex-basis: 60px;
-    color: $text-primary;
+    color: var(--text-primary);
     font-size: 0.625rem;
     user-select: none;
     padding: 0.25rem 0;
@@ -169,7 +168,7 @@ $border-radius: 0.25rem;
 
 .tool-button {
     flex-basis: 60px;
-    color: $text-primary;
+    color: var(--text-primary);
     font-size: 0.625rem;
     user-select: none;
     padding: 0.25rem 0;
@@ -211,7 +210,7 @@ $border-radius: 0.25rem;
 
 [dir="rtl"] .button:not(:last-child) {
     border-left: none;
-    border-right: 1px solid $ui-black-transparent;
+    border-right: 1px solid var(--ui-black-transparent);
 }
 
 .button-group .button:first-child,
@@ -230,4 +229,9 @@ $border-radius: 0.25rem;
 
 .button:disabled > img {
     opacity: 0.25;
+}
+
+/* The toolbar icons are drawn in the light theme's text color. */
+[data-color-mode='dark'] .tool-button img {
+    filter: invert(1) hue-rotate(180deg);
 }

@@ -1,58 +1,139 @@
-$ui-primary: hsla(215, 100%, 95%, 1); /* #E5F0FF */
-$ui-secondary: hsla(215, 75%, 95%, 1); /* #E9F1FC */
-$ui-tertiary: hsla(215, 50%, 90%, 1); /* #D9E3F2 */
+/*
+    Palette for the GUI, read at runtime so that a color mode only has to
+    override the values it changes. This file is imported once, by gui.css.
+*/
+/* ================================
+   Global Scrollbar Styling
+================================ */
 
-$ui-modal-overlay: hsla(215, 100%, 65%, 0.9); /* 90% transparent version of motion-primary */
-$ui-alert-overlay: hsla(215, 100%, 65%, 0.4); /* 40% transparent version of motion-primary */
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(128, 128, 128, 0.55) transparent;
+}
 
-$ui-white: hsla(0, 100%, 100%, 1); /* #FFFFFF */
-$ui-white-dim: hsla(0, 100%, 100%, 0.75); /* 25% transparent version of ui-white */
-$ui-white-transparent: hsla(0, 100%, 100%, 0.25); /* 25% transparent version of ui-white */
-$ui-transparent: hsla(0, 100%, 100%, 0); /* 25% transparent version of ui-white */
+/* Chromium, Safari, Edge */
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
 
-$ui-black-transparent: hsla(0, 0%, 0%, 0.15); /* 15% transparent version of black */
-$ui-black-transparent-10: hsla(0, 0%, 0%, 0.10); /* 10% transparent version of black */
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
 
-$ui-black: hsla(0, 0%, 0%, 1); /* #000000 */
+*::-webkit-scrollbar-thumb {
+    background-color: rgba(128, 128, 128, 0.45);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
 
-$ui-green: hsla(163, 85%, 35%, 1); /* #0DA57A */
-$ui-green-2: hsla(163, 85%, 40%, 1); /* #0FBD8C */
+*::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(128, 128, 128, 0.75);
+}
 
-$ui-orange: hsla(37, 96%, 55%, 1); /* #FAA51D */
-$ui-alert-orange: hsla(32, 100%, 94%, 1); /* #FFF0DF */
-$text-primary: hsla(225, 15%, 40%, 1); /* #575E75 */
-$text-primary-transparent: hsla(225, 15%, 40%, 0.75);
+*::-webkit-scrollbar-thumb:active {
+    background-color: rgba(128, 128, 128, 0.9);
+}
 
-$motion-primary: hsla(215, 100%, 65%, 1); /* #4C97FF */
-$motion-tertiary: hsla(215, 60%, 50%, 1); /* #3373CC */
+/* Hide scrollbar corner */
+*::-webkit-scrollbar-corner {
+    background: transparent;
+}
+:root {
+    --ui-primary: hsla(215, 100%, 95%, 1); /* #E5F0FF */
+    --ui-secondary: hsla(215, 75%, 95%, 1); /* #E9F1FC */
+    --ui-tertiary: hsla(215, 50%, 90%, 1); /* #D9E3F2 */
+    --ui-surface: hsla(0, 100%, 100%, 1); /* #FFFFFF */
+    --ui-gray: hsla(0, 0%, 95%, 1);
+    --ui-blue-10percent: hsla(215, 100%, 65%, 0.1);
+    --ui-blue-25percent: hsla(215, 100%, 65%, 0.25);
 
-$looks-secondary: hsla(260, 60%, 60%, 1); /* #855CD6 */
-$looks-transparent: hsla(260, 60%, 60%, 0.35); /* 35% transparent version of looks-tertiary */
-$looks-light-transparent: hsla(260, 60%, 60%, 0.15); /* 15% transparent version of looks-tertiary */
-$looks-secondary-dark: 	hsla(260, 42%, 51%, 1); /* #714EB6 */
+    --ui-modal-overlay: hsla(215, 100%, 65%, 0.9); /* 90% transparent version of motion-primary */
+    --ui-alert-overlay: hsla(215, 100%, 65%, 0.4); /* 40% transparent version of motion-primary */
 
-$red-primary: hsla(20, 100%, 55%, 1); /* #FF661A */
-$red-tertiary: hsla(20, 100%, 45%, 1); /* #E64D00 */
+    --ui-white: hsla(0, 100%, 100%, 1); /* #FFFFFF */
+    --ui-white-dim: hsla(0, 100%, 100%, 0.75); /* 25% transparent version of ui-white */
+    --ui-white-transparent: hsla(0, 100%, 100%, 0.25); /* 25% transparent version of ui-white */
+    --ui-transparent: hsla(0, 100%, 100%, 0); /* 25% transparent version of ui-white */
 
-$sound-primary: hsla(300, 53%, 60%, 1); /* #CF63CF */
-$sound-tertiary: hsla(300, 48%, 50%, 1); /* #BD42BD */
+    --ui-black-transparent: hsla(0, 0%, 0%, 0.15); /* 15% transparent version of black */
+    --ui-shadow: hsla(0, 0%, 0%, 0.15); /* shadows and glow around surfaces */
 
-$control-primary: hsla(38, 100%, 55%, 1); /* #FFAB19 */
+    --ui-black: hsla(0, 0%, 0%, 1); /* #000000 */
+    --ui-focus-outline: hsla(0, 0%, 0%, 1); /* keyboard focus ring */
 
-$data-primary: hsla(30, 100%, 55%, 1); /* #FF8C1A */
+    --ui-green: hsla(163, 85%, 35%, 1); /* #0DA57A */
+    --ui-green-2: hsla(163, 85%, 40%, 1); /* #0FBD8C */
 
-$pen-primary: hsla(163, 85%, 40%, 1); /* #0FBD8C */
-$pen-transparent: hsla(163, 85%, 40%, 0.25); /* #0FBD8C */
-$pen-tertiary: hsla(163, 86%, 30%, 1); /* #0B8E69 */
+    --ui-orange: hsla(37, 96%, 55%, 1); /* #FAA51D */
+    --ui-alert-orange: hsla(32, 100%, 94%, 1); /* #FFF0DF */
+    --text-primary: hsla(225, 15%, 40%, 1); /* #575E75 */
+    --text-primary-transparent: hsla(225, 15%, 40%, 0.75);
 
-$error-primary: hsla(30, 100%, 55%, 1); /* #FF8C1A */
-$error-light: hsla(30, 100%, 70%, 1); /* #FFB366 */
-$error-transparent: hsla(30, 100%, 55%, 0.25); /* #FF8C1A */
+    --motion-primary: hsla(215, 100%, 65%, 1); /* #4C97FF */
+    --motion-tertiary: hsla(215, 60%, 50%, 1); /* #3373CC */
 
-$extensions-primary: hsla(163, 85%, 40%, 1); /* #0FBD8C */
-$extensions-tertiary: hsla(163, 85%, 30%, 1); /* #0B8E69 */
-$extensions-transparent: hsla(163, 85%, 40%, 0.35); /* 35% transparent version of extensions-primary */
-$extensions-light: hsla(163, 57%, 85%, 1); /* opaque version of extensions-transparent, on white bg */
+    --looks-secondary: hsla(260, 60%, 60%, 1); /* #855CD6 */
+    --looks-transparent: hsla(260, 60%, 60%, 0.35); /* 35% transparent version of looks-tertiary */
+    --looks-light-transparent: hsla(260, 60%, 60%, 0.15); /* 15% transparent version of looks-tertiary */
+    --looks-secondary-dark: hsla(260, 42%, 51%, 1); /* #714EB6 */
 
-$membership-blue: hsla(215, 60%, 46%, 1); /* #2F6ABC */
-$drop-highlight: hsla(215, 100%, 77%, 1); /* lighter than motion-primary */
+    --red-primary: hsla(20, 100%, 55%, 1); /* #FF661A */
+    --red-tertiary: hsla(20, 100%, 45%, 1); /* #E64D00 */
+
+    --sound-primary: hsla(300, 53%, 60%, 1); /* #CF63CF */
+    --sound-tertiary: hsla(300, 48%, 50%, 1); /* #BD42BD */
+
+    --control-primary: hsla(38, 100%, 55%, 1); /* #FFAB19 */
+
+    --data-primary: hsla(30, 100%, 55%, 1); /* #FF8C1A */
+
+    --pen-primary: hsla(163, 85%, 40%, 1); /* #0FBD8C */
+    --pen-transparent: hsla(163, 85%, 40%, 0.25); /* #0FBD8C */
+    --pen-tertiary: hsla(163, 86%, 30%, 1); /* #0B8E69 */
+
+    --error-primary: hsla(30, 100%, 55%, 1); /* #FF8C1A */
+    --error-light: hsla(30, 100%, 70%, 1); /* #FFB366 */
+    --error-transparent: hsla(30, 100%, 55%, 0.25); /* #FF8C1A */
+
+    --extensions-primary: hsla(163, 85%, 40%, 1); /* #0FBD8C */
+    --extensions-tertiary: hsla(163, 85%, 30%, 1); /* #0B8E69 */
+    --extensions-transparent: hsla(163, 85%, 40%, 0.35); /* 35% transparent version of extensions-primary */
+    --extensions-light: hsla(163, 57%, 85%, 1); /* opaque version of extensions-transparent, on white bg */
+
+    --membership-blue: hsla(215, 60%, 46%, 1); /* #2F6ABC */
+    --drop-highlight: hsla(215, 100%, 77%, 1); /* lighter than motion-primary */
+}
+
+:root[data-color-mode='dark'] {
+    /* Keeps the page dark where the app does not cover it. */
+    background-color: hsla(225, 18%, 11%, 1);
+
+    --ui-primary: hsla(225, 18%, 11%, 1);
+    --ui-secondary: hsla(225, 18%, 14%, 1);
+    --ui-tertiary: hsla(225, 18%, 19%, 1);
+    --ui-surface: hsla(225, 18%, 17%, 1);
+    --ui-gray: hsla(225, 18%, 22%, 1);
+    --ui-blue-10percent: hsla(215, 100%, 65%, 0.15);
+    --ui-blue-25percent: hsla(215, 100%, 65%, 0.3);
+
+    --ui-modal-overlay: hsla(225, 45%, 6%, 0.9);
+    --ui-alert-overlay: hsla(225, 45%, 6%, 0.4);
+
+    --ui-black-transparent: hsla(0, 0%, 100%, 0.15);
+    --ui-shadow: hsla(0, 0%, 0%, 0.6);
+
+    --ui-focus-outline: hsla(0, 0%, 100%, 1);
+
+    --ui-alert-orange: hsla(32, 60%, 20%, 1);
+    --text-primary: hsla(220, 15%, 85%, 1);
+    --text-primary-transparent: hsla(220, 15%, 85%, 0.75);
+
+    --extensions-light: hsla(163, 40%, 20%, 1);
+    --drop-highlight: hsla(215, 100%, 40%, 1);
+}
+:global(.injectionDiv svg.blocklySvg pattern[id^="blocklyGridPattern"] line) {
+    stroke: #53244fa3 !important;
+}

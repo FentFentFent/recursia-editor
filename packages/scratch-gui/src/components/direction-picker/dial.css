@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 
 .container {
     padding: 1rem;
@@ -35,7 +34,7 @@ $dial-size: 40px;
 }
 
 .gauge-path {
-    fill: $looks-transparent;
-    stroke: $looks-secondary;
+    fill: var(--looks-transparent);
+    stroke: var(--looks-secondary);
     stroke-width: 1px;
 }

@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 @import "../../css/units.css";
 
 .user-thumbnail {
@@ -6,11 +5,11 @@
     height: $menu-bar-button-size;
     border-radius: $form-radius;
     vertical-align: middle;
-    box-shadow: 0 0 0 1px $ui-black-transparent;
+    box-shadow: 0 0 0 1px var(--ui-shadow);
 }
 
 .avatar-badge {
-    border: 1px solid $ui-orange;
+    border: 1px solid var(--ui-orange);
     box-sizing: border-box;
     border-radius: 17%;
     box-shadow: none;

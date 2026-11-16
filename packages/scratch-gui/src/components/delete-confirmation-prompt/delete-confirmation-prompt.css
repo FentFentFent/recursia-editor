@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 @import "../../css/units.css";
 
 .body {
@@ -7,7 +6,7 @@
 }
 
 .label {
-    color: $ui-white;
+    color: var(--ui-white);
     font-size: 1.25rem;
     font-weight: 700;
     margin: 1rem 0 1.5rem;
@@ -20,9 +19,9 @@
     width: 47%;
     padding: 0.75rem 1rem;
     border-radius: 2rem;
-    border: 1px solid $ui-black-transparent;
-    color: $looks-secondary;
-    background: $ui-white;
+    border: 1px solid var(--ui-black-transparent);
+    color: var(--looks-secondary);
+    background: var(--ui-surface);
     font-weight: 600;
     font-size: 0.85rem;
     cursor: pointer;

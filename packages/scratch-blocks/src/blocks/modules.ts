@@ -18,6 +18,21 @@ Blockly.Blocks.modules_single_export = {
         })
     }
 }
+Blockly.Blocks.modules_reporter_export = {
+    init: function (this: Blockly.BlockSvg) {
+        this.jsonInit({
+            message0: Blockly.Msg.MODULES_EXPORTSREPORTER,
+            message1: '%1',
+            args1: [
+                {
+                    type: 'input_value',
+                    name: 'EXPORT',
+                },
+            ],
+            extensions: ['colours_modules','shape_bowler_hat','shape_hat','shape_meta'],
+        })
+    }
+}
 //
 Blockly.Blocks.modules_export = {
     init: function (this: Blockly.BlockSvg) {

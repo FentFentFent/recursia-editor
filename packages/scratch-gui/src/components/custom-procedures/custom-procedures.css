@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 @import "../../css/units.css";
 
 .modal-content {
@@ -7,7 +6,7 @@
 }
 
 .body {
-    background: $ui-white;
+    background: var(--ui-surface);
     padding: 1.5rem 2.25rem;
 }
 
@@ -31,7 +30,7 @@
 }
 
 .workspace :global(.blocklySvg) {
-    background-color: $ui-primary;
+    background-color: var(--ui-primary);
 }
 
 /* Row of "card" buttons for modifying custom procedures */
@@ -41,8 +40,8 @@
 }
 
 .option-card {
-    background: white;
-    border: 2px solid $ui-black-transparent;
+    background: var(--ui-surface);
+    border: 2px solid var(--ui-black-transparent);
     border-radius: $space;
     padding: calc($space * 2);
     text-align: center;
@@ -53,8 +52,8 @@
 }
 
 .option-card:hover {
-    border: 2px solid $looks-secondary;
-    box-shadow: 0px 0px 0px 4px $looks-transparent;
+    border: 2px solid var(--looks-secondary);
+    box-shadow: 0px 0px 0px 4px var(--looks-transparent);
 }
 
 .option-card + .option-card {
@@ -75,6 +74,12 @@
     margin-top: 1rem;
 }
 
+/* Checkboxes are drawn by the browser, so they need to be told to render dark. */
+[data-color-mode='dark'] .checkbox-row input[type="checkbox"] {
+    color-scheme: dark;
+    accent-color: var(--looks-secondary);
+}
+
 /* Confirmation buttons at the bottom of the modal */
 .button-row {
     margin-top: 1rem;
@@ -83,17 +88,18 @@
 }
 
 .button-row button {
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     border-radius: 0.25rem;
     padding: 0.75rem 1rem;
-    background: white;
+    background: var(--ui-surface);
+    color: var(--text-primary);
     font-weight: bold;
     font-size: 0.85rem;
 }
 
 .button-row button.ok-button {
-    background: $looks-secondary;
-    border: $looks-secondary;
+    background: var(--looks-secondary);
+    border: var(--looks-secondary);
     color: white;
 }
 

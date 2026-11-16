@@ -20,6 +20,7 @@ class Recursia1ModuleBlocks {
     getPrimitives() {
         return { // No implementation, they are just blocks used for metadata.
             modules_single_export: () => { },
+            modules_reporter_export: () => { },
             modules_export: () => { }
         };
     }

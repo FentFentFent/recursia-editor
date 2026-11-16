@@ -12,7 +12,9 @@ import {stripInvalidPaperData} from '../helper/strip-invalid-paper-data';
 import {performSnapshot} from '../helper/undo';
 import {undoSnapshot, clearUndoState} from '../reducers/undo';
 import {isGroup, ungroupItems} from '../helper/group';
-import {clearRaster, convertBackgroundGuideLayer, getRaster, setupLayers} from '../helper/layer';
+import {
+    clearRaster, convertBackgroundGuideLayer, getRaster, refreshBackgroundColors, setupLayers
+} from '../helper/layer';
 import {clearSelectedItems} from '../reducers/selected-items';
 import {
     ART_BOARD_WIDTH, ART_BOARD_HEIGHT, CENTER, MAX_WORKSPACE_BOUNDS,
@@ -67,6 +69,15 @@ class PaperCanvas extends React.Component {
         paper.settings.handleSize = 0;
         // Make layers.
         setupLayers(this.props.format);
+        // The checkerboard is drawn by paper rather than styled with CSS, so it
+        // has to be recolored when the color mode changes while the editor is open.
+        if (typeof MutationObserver !== 'undefined') {
+            this.colorModeObserver = new MutationObserver(refreshBackgroundColors);
+            this.colorModeObserver.observe(document.documentElement, {
+                attributes: true,
+                attributeFilter: ['data-color-mode']
+            });
+        }
         this.importImage(
             this.props.imageFormat, this.props.image, this.props.rotationCenterX, this.props.rotationCenterY);
     }
@@ -83,6 +94,10 @@ class PaperCanvas extends React.Component {
     }
     componentWillUnmount () {
         this.clearQueuedImport();
+        if (this.colorModeObserver) {
+            this.colorModeObserver.disconnect();
+            this.colorModeObserver = null;
+        }
         // shouldZoomToFit means the zoom level hasn't been initialized yet
         if (!this.shouldZoomToFit) {
             this.props.saveZoomLevel();

@@ -66,7 +66,7 @@ const blockColors = {
         colorQuaternary: '#FF6680'
     },
     modules: {
-        colourPrimary: '#331419',
+        colourPrimary: '#331430',
         colourSecondary: '#4C4C4C',
         colourTertiary: '#c466ff',
         colorQuaternary: '#ff66fc'

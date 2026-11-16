@@ -1,5 +1,4 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 
 .row {
     display: flex;
@@ -8,7 +7,7 @@
 
 .button {
     margin: 0;
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     background: none;
     outline: none;
     cursor: pointer;
@@ -33,7 +32,7 @@
 
 [dir="rtl"] .button:not(:last-child) {
     border-left: none;
-    border-right: 1px solid $ui-black-transparent;
+    border-right: 1px solid var(--ui-black-transparent);
 }
 
 .button:focus::before {
@@ -43,7 +42,7 @@
     right: -1px;
     bottom: -1px;
     left: -1px;
-    border: 1px solid $looks-secondary;
+    border: 1px solid var(--looks-secondary);
 }
 
 /* round corners for first and last buttons */
@@ -65,7 +64,7 @@
 /* selected button styling */
 
 .button[aria-pressed='true'] {
-    background-color: $looks-light-transparent;
+    background-color: var(--looks-light-transparent);
 }
 
 .button[aria-pressed='true'] > img {
@@ -75,7 +74,7 @@
 /* pressed button styling */
 
 .button:active {
-    background-color: $looks-transparent;
+    background-color: var(--looks-transparent);
 }
 
 /* disabled styling */

@@ -220,6 +220,15 @@ const GUIComponent = props => {
     }, [props.platform]);
 
     useEffect(() => {
+        // The chrome is styled through the palette on the document root, so the
+        // color mode belongs there: modals and menus rendered outside of this
+        // element have to follow it too.
+        const root = document.documentElement;
+        root.setAttribute('data-color-mode', colorMode);
+        return () => root.removeAttribute('data-color-mode');
+    }, [colorMode]);
+
+    useEffect(() => {
         if (
             !isFetchingUserData &&
             !themeMap[theme]?.isAvailable?.({hasActiveMembership})

@@ -1,20 +1,19 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 
 .question-container {
     margin: $space;
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     border-radius: $space;
     border-width: 2px;
     padding: 1rem;
-    background: white;
+    background: var(--ui-surface);
 }
 
 .question-label {
     font-size: 0.75rem;
     font-weight: bold;
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    color: $text-primary;
+    color: var(--text-primary);
     padding-bottom: $space;
 }
 
@@ -34,7 +33,7 @@
     border-radius: 100%;
 
     color: white;
-    background: $looks-secondary;
+    background: var(--looks-secondary);
 }
 
 [dir="ltr"] .question-submit-button {
@@ -60,7 +59,7 @@
 }
 
 .question-input > input:focus {
-    box-shadow: 0px 0px 0px 3px $looks-transparent;
+    box-shadow: 0px 0px 0px 3px var(--looks-transparent);
 }
 
 .question-submit-button-icon {
@@ -69,4 +68,9 @@
     position: relative;
     right: -7px;
     left: -7px;
+}
+
+/* The submit icon is drawn in the light theme's text color. */
+[data-color-mode='dark'] .question-submit-button-icon {
+    filter: invert(1) hue-rotate(180deg);
 }

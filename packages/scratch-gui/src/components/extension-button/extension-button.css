@@ -1,5 +1,4 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 @import "../../css/z-index.css";
 
 .extension-button-container {
@@ -10,9 +9,9 @@
     left: 0;
     right: 0;
     z-index: $z-index-extension-button;
-    background: $looks-secondary;
+    background: var(--looks-secondary);
 
-    border: 1px solid $looks-secondary;
+    border: 1px solid var(--looks-secondary);
     box-sizing: content-box; /* To match scratch-block vertical toolbox borders */
 }
 
@@ -39,7 +38,7 @@ $fade-out-distance: 15px;
 }
 
 .extension-button:focus-visible {
-    outline: 0.0625rem auto $ui-black;
+    outline: 0.0625rem auto var(--ui-focus-outline);
 }
 
 .extension-button-icon {

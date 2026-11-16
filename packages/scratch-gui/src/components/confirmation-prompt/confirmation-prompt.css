@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 @import "../../css/units.css";
 
 .modal-container {
@@ -8,14 +7,14 @@
     flex-direction: column;
     align-items: flex-start;
     border-radius: 0.5rem;
-    background: $looks-secondary;
+    background: var(--looks-secondary);
     gap: 0.9375rem;
     box-sizing: border-box;
 }
 
 .label {
     align-self: stretch;
-    color: $ui-white;
+    color: var(--ui-white);
     text-align: center;
     font-size: 1rem;
     font-weight: 700;
@@ -41,7 +40,7 @@
     border-radius: 2.5rem;
     background: inherit;
     cursor: pointer;
-    color: $ui-white;
+    color: var(--ui-white);
 }
 
 .confirm-button:focus,
@@ -57,15 +56,15 @@
 }
 
 .confirm-button {
-    background: $ui-white;
+    background: var(--ui-surface);
 }
 
 .confirm-button span {
-    color: $looks-secondary;
+    color: var(--looks-secondary);
 }
 
 .cancel-button {
-    border: 0.0625rem solid $ui-white;
+    border: 0.0625rem solid var(--ui-white);
 }
 
 .button-icon {

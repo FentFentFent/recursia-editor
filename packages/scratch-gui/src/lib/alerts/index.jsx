@@ -177,31 +177,13 @@ const alerts = [
         clearList: ['cloudInfo'],
         content: (
             <FormattedMessage
-                defaultMessage="Please note, cloud variables only support numbers, not letters or symbols. <a>{learnMoreLink}</a>" // eslint-disable-line @stylistic/max-len
+                defaultMessage="Cloud variables do not work in Recursia, there is no server for them currently." // eslint-disable-line @stylistic/max-len
                 description="Info about cloud variable limitations"
                 id="gui.alerts.cloudInfo"
-                values={{
-                    learnMoreLink: (
-                        <FormattedMessage
-                            defaultMessage="Learn more."
-                            description="Link text to cloud var faq"
-                            id="gui.alerts.cloudInfoLearnMore"
-                        />
-                    ),
-                    a: learnMoreLink => (
-                        <a
-                            href="https://scratch.mit.edu/info/faq/#clouddata"
-                            rel="noopener noreferrer"
-                            target="_blank"
-                        >
-                            {learnMoreLink}
-                        </a>
-                    )
-                }}
             />
         ),
         closeButton: true,
-        level: AlertLevels.SUCCESS,
+        level: AlertLevels.WARN,
         maxDisplaySecs: 15
     },
     {
@@ -216,7 +198,7 @@ const alerts = [
             />
         ),
         closeButton: true,
-        level: AlertLevels.INFO
+        level: AlertLevels.INFO_BLUE
     },
     {
         alertId: 'importingAsset',

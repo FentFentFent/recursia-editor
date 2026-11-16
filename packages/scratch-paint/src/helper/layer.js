@@ -8,6 +8,21 @@ const CHECKERBOARD_SIZE = 8;
 const CROSSHAIR_SIZE = 16;
 const CROSSHAIR_FULL_OPACITY = 0.75;
 
+/**
+ * Read a palette color from the document, so the canvas follows the color mode.
+ * @param {string} name Custom property name, including the leading dashes.
+ * @param {string} fallback Color to use when the property is not defined.
+ * @returns {string} The color.
+ */
+const _cssColor = function (name, fallback) {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return fallback;
+
+    const value = window.getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+    return value || fallback;
+};
+
 const _getLayer = function (layerString) {
     for (const layer of paper.project.layers) {
         if (layer.data && layer.data[layerString]) {
@@ -198,7 +213,7 @@ const _makeBackgroundPaper = function (width, height, color, opacity) {
     const vRect = new paper.Shape.Rectangle(
         new paper.Point(0, 0),
         new paper.Point(ART_BOARD_WIDTH / CHECKERBOARD_SIZE, ART_BOARD_HEIGHT / CHECKERBOARD_SIZE));
-    vRect.fillColor = '#fff';
+    vRect.fillColor = _cssColor('--paint-checker-base', '#fff');
     vRect.guide = true;
     vRect.locked = true;
     vRect.position = CENTER;
@@ -289,8 +304,10 @@ const _makeBackgroundGuideLayer = function (format) {
     const guideLayer = new paper.Layer();
     guideLayer.locked = true;
 
+    const checkerSquareColor = _cssColor('--paint-checker-square', '#D9E3F2');
+
     const vWorkspaceBounds = new paper.Shape.Rectangle(MAX_WORKSPACE_BOUNDS);
-    vWorkspaceBounds.fillColor = '#ECF1F9';
+    vWorkspaceBounds.fillColor = _cssColor('--paint-workspace-bounds', '#ECF1F9');
     vWorkspaceBounds.position = CENTER;
 
     // Add 1 to the height because it's an odd number otherwise, and we want it to be even
@@ -298,7 +315,7 @@ const _makeBackgroundGuideLayer = function (format) {
     const vBackground = _makeBackgroundPaper(
         MAX_WORKSPACE_BOUNDS.width / CHECKERBOARD_SIZE,
         (MAX_WORKSPACE_BOUNDS.height / CHECKERBOARD_SIZE) + 1,
-        '#D9E3F2', 0.55);
+        checkerSquareColor, 0.55);
     vBackground.position = CENTER;
     vBackground.scaling = new paper.Point(CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
 
@@ -311,7 +328,7 @@ const _makeBackgroundGuideLayer = function (format) {
     const bitmapBackground = _makeBackgroundPaper(
         ART_BOARD_WIDTH / CHECKERBOARD_SIZE,
         ART_BOARD_HEIGHT / CHECKERBOARD_SIZE,
-        '#D9E3F2', 0.55);
+        checkerSquareColor, 0.55);
     bitmapBackground.position = CENTER;
     bitmapBackground.scaling = new paper.Point(CHECKERBOARD_SIZE, CHECKERBOARD_SIZE);
     bitmapBackground.guide = true;
@@ -324,6 +341,34 @@ const _makeBackgroundGuideLayer = function (format) {
 
     guideLayer.data.isBackgroundGuideLayer = true;
     return guideLayer;
+};
+
+/**
+ * Recolor the background checkerboard from the current palette, so it follows a
+ * color mode change while the editor is open.
+ * @returns {undefined}
+ */
+const refreshBackgroundColors = function () {
+    const layer = getBackgroundGuideLayer();
+    if (!layer) return;
+
+    const baseColor = _cssColor('--paint-checker-base', '#fff');
+    const squareColor = _cssColor('--paint-checker-square', '#D9E3F2');
+    const boundsColor = _cssColor('--paint-workspace-bounds', '#ECF1F9');
+
+    // A checkerboard group is [base rectangle, path of squares, clip mask].
+    const setCheckerColors = checker => {
+        if (!checker) return;
+        checker.children[0].fillColor = baseColor;
+        checker.children[1].fillColor = squareColor;
+    };
+
+    setCheckerColors(layer.bitmapBackground);
+    if (layer.vectorBackground) {
+        layer.vectorBackground.children[0].fillColor = boundsColor;
+        setCheckerColors(layer.vectorBackground.children[1]);
+    }
+    paper.view.update();
 };
 
 const setupLayers = function (format) {
@@ -350,6 +395,7 @@ export {
     getGuideLayer,
     getBackgroundGuideLayer,
     convertBackgroundGuideLayer,
+    refreshBackgroundColors,
     clearRaster,
     getRaster,
     setGuideItem,

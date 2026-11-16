@@ -1,4 +1,3 @@
-@import "../../css/colors.css";
 
 .stop-all {
     width: 2rem;
@@ -17,7 +16,7 @@
 }
 
 .stop-all:hover {
-    background-color: $looks-light-transparent;
+    background-color: var(--looks-light-transparent);
 }
 
 .stop-all {

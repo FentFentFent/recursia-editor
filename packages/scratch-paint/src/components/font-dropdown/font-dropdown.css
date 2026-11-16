@@ -16,7 +16,7 @@
 }
 
 .mod-menu-item:hover {
-    background: $looks-secondary;
+    background: var(--paint-looks-secondary);
     color: white;
 }
 
@@ -35,7 +35,7 @@
 
 .font-dropdown {
     align-items: center;
-    color: $text-primary;
+    color: var(--paint-text-primary);
     display: flex;
     font-size: 1rem;
     justify-content: space-between;

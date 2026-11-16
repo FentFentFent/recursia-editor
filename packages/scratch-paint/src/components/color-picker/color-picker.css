@@ -3,8 +3,8 @@
 
 /* Popover styles */
 :global(.Popover-body) {
-    background: white;
-    border: 1px solid #ddd;
+    background: var(--paint-ui-surface);
+    border: 1px solid var(--paint-ui-pane-border);
     padding: 4px;
     border-radius: 4px;
     padding: 4px;
@@ -13,7 +13,7 @@
 
 :global(.Popover-tipShape) {
     fill: white;
-    stroke: #ddd;
+    stroke: var(--paint-ui-pane-border);
 }
 
 .clickable {
@@ -29,7 +29,7 @@
 .row-header {
     font-family: "Helvetica Neue", Helvetica, sans-serif;
     font-size: 0.65rem;
-    color: #575E75;
+    color: var(--paint-text-primary);
     margin: 8px;
 }
 
@@ -46,7 +46,7 @@
 }
 
 .divider {
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--paint-ui-pane-border);
     margin: 8px;
 }
 
@@ -62,7 +62,7 @@
 .swatch {
     width: 1.5rem;
     height: 1.5rem;
-    border: 1px solid #ddd;
+    border: 1px solid var(--paint-ui-pane-border);
     border-radius: 4px;
     box-sizing: content-box;
     display: flex;
@@ -80,8 +80,8 @@
 }
 
 .active-swatch {
-    border: 1px solid $looks-secondary;
-    box-shadow: 0px 0px 0px 3px $looks-transparent;
+    border: 1px solid var(--paint-looks-secondary);
+    box-shadow: 0px 0px 0px 3px var(--paint-looks-transparent);
 }
 
 .swatch-icon {

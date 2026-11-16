@@ -782,6 +782,7 @@ const modules = function (isInitialSetup,isStage,targetId,colors) {
         secondaryColour="${ colors.colourTertiary }"
             >
         <block type="modules_single_export"></block>
+        <block type="modules_reporter_export"></block>
         <block type="modules_export"></block>
     
     </category>

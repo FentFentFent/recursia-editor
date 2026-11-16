@@ -1,5 +1,6 @@
 {
   "MODULES_EXPORTSINGULAR": "export one block:",
+  "MODULES_EXPORTSREPORTER": "export reporter block:",
   "MODULES_EXPORTSMULTIPLE": "export multiple blocks:",
   "CONTROL_FOREVER": "forever",
   "CONTROL_REPEAT": "repeat %1",

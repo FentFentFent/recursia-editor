@@ -1,5 +1,4 @@
 @import "../../css/units.css";
-@import "../../css/colors.css";
 @import "../../css/z-index.css";
 
 .blocks {
@@ -14,7 +13,7 @@
     width: 100%;
     height: 100%;
     opacity: 0.75;
-    background-color: $drop-highlight;
+    background-color: var(--drop-highlight);
     transition: all 0.25s ease;
 }
 
@@ -24,7 +23,7 @@
     right: 0;
     bottom: 0;
     left: 0;
-    border: 1px solid $ui-black-transparent;
+    border: 1px solid var(--ui-black-transparent);
     border-top-right-radius: $space;
     border-bottom-right-radius: $space;
 }
@@ -46,8 +45,8 @@
 */
 .blocks :global(.blocklyToolbox),
 .blocks :global(.blocklyToolboxDiv) {
-    border-right: 1px solid $ui-black-transparent;
-    border-bottom: 1px solid $ui-black-transparent;
+    border-right: 1px solid var(--ui-black-transparent);
+    border-bottom: 1px solid var(--ui-black-transparent);
     box-sizing: content-box;
     height: calc(100% - 3.25rem) !important;
 
@@ -63,7 +62,7 @@
 [dir="rtl"] .blocks :global(.blocklyToolbox),
 [dir="rtl"] .blocks :global(.blocklyToolboxDiv) {
     border-right: none;
-    border-left: 1px solid $ui-black-transparent;
+    border-left: 1px solid var(--ui-black-transparent);
 }
 
 .blocks :global(.blocklyToolbox::-webkit-scrollbar),
@@ -72,13 +71,13 @@
 }
 
 .blocks :global(.blocklyFlyout) {
-    border-right: 1px solid $ui-black-transparent;
+    border-right: 1px solid var(--ui-black-transparent);
     box-sizing: content-box;
 }
 
 [dir="rtl"] .blocks :global(.blocklyFlyout) {
     border-right: none;
-    border-left: 1px solid $ui-black-transparent;
+    border-left: 1px solid var(--ui-black-transparent);
 }
 
 
