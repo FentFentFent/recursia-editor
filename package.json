@@ -15,6 +15,7 @@
     "license": "AGPL-3.0-only",
     "author": "Scratch Foundation",
     "workspaces": [
+        "packages/scratch-blocks",
         "packages/task-herder",
         "packages/scratch-storage",
         "packages/scratch-svg-renderer",
@@ -22,8 +23,7 @@
         "packages/scratch-render",
         "packages/scratch-vm",
         "packages/scratch-gui",
-        "packages/scratch-media-lib-scripts",
-        "packages/scratch-blocks"
+        "packages/scratch-media-lib-scripts"
     ],
     "scripts": {
         "build": "cross-env NODE_ENV=production npm run --workspaces build",
