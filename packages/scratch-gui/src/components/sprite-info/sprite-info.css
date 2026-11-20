@@ -97,7 +97,16 @@ body .icon {
     filter: invert(1) hue-rotate(180deg);
 }
 
-[data-color-mode='dark'] .rotation-select {
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
+[data-color-mode='cherry-dark'] .icon {
+    filter: invert(1) hue-rotate(258deg);
+}
+
+[data-color-mode='dark'] .rotation-select, [data-color-mode='cherry-dark'] .rotation-select {
     background-color: var(--ui-surface);
     color: var(--text-primary);
 }

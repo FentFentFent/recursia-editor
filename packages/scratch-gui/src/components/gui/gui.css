@@ -162,6 +162,12 @@
     filter: none;
 }
 
+/* The tab icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .tab.is-selected img,
+[data-color-mode='cherry-dark'] .tab.is-selected img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 /* Tab style overrides from react-tabs */
 .tab:after {
     display: none;

@@ -319,7 +319,7 @@ body .card-container {
     display: none;
 }
 
-[data-color-mode='dark'] .step-image {
+[data-color-mode='dark'] .step-image, [data-color-mode='cherry-dark'] .step-image {
     background: var(--ui-secondary);
     border-color: var(--ui-black-transparent);
 }

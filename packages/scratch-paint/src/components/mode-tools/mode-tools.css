@@ -13,6 +13,12 @@
     height: 2rem;
 }
 
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .mode-tools-icon,
+[data-color-mode='cherry-dark'] .mode-tools-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 [dir="ltr"] .mod-dashed-border {
     border-right: 1px dashed var(--paint-ui-pane-border);
     padding-right: calc(3 * $grid-unit);

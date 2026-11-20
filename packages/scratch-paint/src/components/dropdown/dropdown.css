@@ -30,6 +30,12 @@ $arrow-border-width: 14px;
     margin-right: .5rem;
 }
 
+/* The caret is drawn in the accent color, so shift it to the cherry hue. */
+[data-color-mode='cherry-light'] .dropdown-icon,
+[data-color-mode='cherry-dark'] .dropdown-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 .mod-caret-up {
     transform: rotate(180deg);
     padding-bottom: 0;

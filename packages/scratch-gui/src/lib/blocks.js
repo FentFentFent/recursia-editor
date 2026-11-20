@@ -6,6 +6,10 @@
 export default function (vm) {
     const ScratchBlocks = require('scratch-blocks');
 
+    // Extensions loaded before the blocks workspace existed (e.g. in a player-only view) can wait
+    // on this to know when ScratchBlocks is available.
+    vm.extensionManager.setScratchBlocks(ScratchBlocks);
+
     const jsonForMenuBlock = function (name, menuOptionsFn, category, start) {
         return {
             message0: '%1',

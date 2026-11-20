@@ -49,7 +49,50 @@ import gdxforConnectionSmallIconURL from './gdxfor/gdxfor-small.svg';
 import faceSensingIconURL from './faceSensing/faceSensing.png';
 import faceSensingInsetIconURL from './faceSensing/faceSensing-small.svg';
 
+import customIconURL from './custom/custom.png'
+import tempvarsIconURL from './tempvars/tempvars.png';
+
 export default [
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Custom Extension"
+                description="Name for the 'Custom Extension' library item"
+                id="gui.extension.custom.name"
+            />
+        ),
+        description: (
+            <FormattedMessage
+                defaultMessage="Load an extension from JavaScript source, a URL, or a file."
+                description="Description for the 'Custom Extension' library item"
+                id="gui.extension.custom.description"
+            />
+        ),
+        extensionId: 'custom',
+        iconURL: customIconURL,
+        featured: true,
+        // Opens the custom extension modal instead of loading an extension by id.
+        opensCustomExtensionModal: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Temporary Variables"
+                description="Name for the 'Temporary Variables' library item"
+                id="gui.extension.tempvars.name"
+            />
+        ),
+        description: (
+            <FormattedMessage
+                defaultMessage="Create and manage multiple variables that won't clutter the block palette."
+                description="Description for the 'Temporary Variables' library item"
+                id="gui.extension.tempvars.description"
+            />
+        ),
+        extensionId: 'tempvars',
+        iconURL: tempvarsIconURL,
+        featured: true
+    },
     {
         name: (
             <FormattedMessage

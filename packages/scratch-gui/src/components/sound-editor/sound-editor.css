@@ -231,7 +231,17 @@ $border-radius: 0.25rem;
     opacity: 0.25;
 }
 
+/* The editor icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .editor-container img,
+[data-color-mode='cherry-dark'] .editor-container img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 /* The toolbar icons are drawn in the light theme's text color. */
 [data-color-mode='dark'] .tool-button img {
     filter: invert(1) hue-rotate(180deg);
+}
+
+[data-color-mode='cherry-dark'] .tool-button img {
+    filter: invert(1) hue-rotate(258deg);
 }

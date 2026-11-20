@@ -1,0 +1,100 @@
+.modal-content {
+    width: 480px;
+}
+
+.body {
+    background: var(--ui-surface);
+    padding: 1.5rem 2.25rem;
+    font-size: .875rem;
+    font-weight: normal;
+    line-height: 1.4;
+}
+
+.tabs {
+    display: flex;
+    margin-top: 1rem;
+    border-bottom: 1px solid var(--ui-black-transparent);
+}
+
+.tab {
+    padding: .5rem .75rem;
+    border: none;
+    border-bottom: 3px solid transparent;
+    background: none;
+    color: var(--text-primary-transparent);
+    font-size: .8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tab:hover {
+    color: var(--text-primary);
+}
+
+.active-tab {
+    color: var(--text-primary);
+    border-bottom-color: var(--looks-secondary);
+}
+
+.tab-panel {
+    min-height: 6rem;
+    padding-top: 1rem;
+}
+
+.file-input {
+    width: 100%;
+    font-size: .875rem;
+}
+
+/* The file picker is drawn by the browser, so it needs to be told to render dark. */
+[data-color-mode='dark'] .file-input, [data-color-mode='cherry-dark'] .file-input {
+    color-scheme: dark;
+}
+
+.text-input,
+.text-area {
+    width: 100%;
+    padding: .75rem;
+    border: 1px solid var(--ui-black-transparent);
+    border-radius: .25rem;
+    background-color: var(--ui-secondary);
+    color: var(--text-primary);
+    font-size: .875rem;
+}
+
+.text-area {
+    min-height: 6rem;
+    font-family: monospace;
+    resize: vertical;
+}
+
+.button-row {
+    background: var(--ui-surface);
+    padding: 0 2.25rem 1.5rem;
+    font-weight: bolder;
+    text-align: right;
+}
+
+.button-row button {
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-black-transparent);
+    color: var(--text-primary);
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.button-row button.load-button {
+    background: var(--looks-secondary);
+    border: var(--looks-secondary);
+    color: white;
+}
+
+[dir="ltr"] .button-row button + button {
+    margin-left: 0.5rem;
+}
+
+[dir="rtl"] .button-row button + button {
+    margin-right: 0.5rem;
+}

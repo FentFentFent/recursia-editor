@@ -49,3 +49,61 @@ color mode, which sets `data-color-mode` on the document root. */
 
     --paint-form-border: hsla(225, 18%, 26%, 1);
 }
+
+:root[data-color-mode='cherry-light'] {
+    --paint-ui-surface: #FFFAFC;
+
+    /* Checkerboard tinted toward the cherry accent. */
+    --paint-checker-base: #FFFAFC;
+    --paint-checker-square: #F3D6E2;
+    --paint-workspace-bounds: #FBEDF3;
+    --paint-ui-pane-border: #EAD3DD;
+    --paint-ui-pane-gray: #FEF7FA;
+    --paint-ui-background-blue: #FBEAF1;
+
+    --paint-text-primary: hsla(335, 22%, 34%, 1);
+
+    --paint-looks-secondary: hsla(338, 70%, 54%, 1);
+    --paint-looks-transparent: hsla(338, 70%, 54%, 0.35);
+
+    --paint-red-primary: hsla(350, 85%, 55%, 1);
+    --paint-red-tertiary: hsla(350, 85%, 45%, 1);
+
+    --paint-sound-primary: hsla(322, 60%, 55%, 1);
+    --paint-sound-tertiary: hsla(322, 55%, 45%, 1);
+
+    --paint-control-primary: hsla(20, 90%, 58%, 1);
+
+    --paint-data-primary: hsla(10, 85%, 56%, 1);
+
+    --paint-form-border: #F2D9E3;
+}
+
+:root[data-color-mode='cherry-dark'] {
+    --paint-ui-surface: hsla(335, 18%, 17%, 1);
+
+    /* Dark checkerboard, with the squares tinted toward the cherry accent. */
+    --paint-checker-base: hsla(335, 18%, 17%, 1);
+    --paint-checker-square: hsla(338, 24%, 28%, 1);
+    --paint-workspace-bounds: hsla(335, 18%, 12%, 1);
+    --paint-ui-pane-border: hsla(335, 18%, 26%, 1);
+    --paint-ui-pane-gray: hsla(335, 18%, 14%, 1);
+    --paint-ui-background-blue: hsla(335, 18%, 12%, 1);
+
+    --paint-text-primary: hsla(335, 18%, 87%, 1);
+
+    --paint-looks-secondary: hsla(338, 65%, 56%, 1);
+    --paint-looks-transparent: hsla(338, 65%, 56%, 0.35);
+
+    --paint-red-primary: hsla(350, 80%, 62%, 1);
+    --paint-red-tertiary: hsla(350, 80%, 52%, 1);
+
+    --paint-sound-primary: hsla(322, 65%, 62%, 1);
+    --paint-sound-tertiary: hsla(322, 60%, 52%, 1);
+
+    --paint-control-primary: hsla(20, 85%, 60%, 1);
+
+    --paint-data-primary: hsla(10, 80%, 58%, 1);
+
+    --paint-form-border: hsla(335, 18%, 26%, 1);
+}

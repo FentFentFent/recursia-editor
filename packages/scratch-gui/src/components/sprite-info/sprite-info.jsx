@@ -39,6 +39,11 @@ const messages = defineMessages({
         id: 'gui.SpriteInfo.hideSpriteAction',
         defaultMessage: 'Hide sprite',
         description: 'Tooltip for hide sprite button'
+    },
+    stage: {
+        id: 'gui.stageSelector.stage',
+        defaultMessage: 'Stage',
+        description: 'Label for the stage in the stage selector'
     }
 });
 
@@ -50,6 +55,7 @@ class SpriteInfo extends React.Component {
             this.props.name !== nextProps.name ||
             this.props.stageSize !== nextProps.stageSize ||
             this.props.visible !== nextProps.visible ||
+            (this.props.stage && this.props.stage.id) !== (nextProps.stage && nextProps.stage.id) ||
             JSON.stringify(this.props.dependencies) !== JSON.stringify(nextProps.dependencies) ||
             JSON.stringify(this.props.sprites) !== JSON.stringify(nextProps.sprites) ||
             // Only update these if rounded value has changed
@@ -65,11 +71,20 @@ class SpriteInfo extends React.Component {
         } = this.props;
 
         const sprites = this.props.sprites || this.props.targets || {};
+        const stage = this.props.stage;
+        const stageName = this.props.intl.formatMessage(messages.stage);
         const dependencyNames = (this.props.dependencies || []).map(dep => {
             if (typeof dep === 'string') {
+                // The stage is not part of the sprites map, so resolve it by its id.
+                if (stage && stage.id === dep) {
+                    return stageName;
+                }
                 return (sprites[dep] && sprites[dep].name) ? sprites[dep].name : dep;
             }
             if (dep && typeof dep === 'object') {
+                if (dep.isStage) {
+                    return stageName;
+                }
                 return dep.name || dep.id || String(dep);
             }
             return String(dep);
@@ -278,6 +293,11 @@ SpriteInfo.propTypes = {
     dependencies: PropTypes.any,
     // Map of targets/sprites keyed by id, used to resolve dependency ids to names.
     sprites: PropTypes.object,
+    // The stage target, whose dependencies are shown by name rather than id.
+    stage: PropTypes.shape({
+        id: PropTypes.string,
+        name: PropTypes.string
+    }),
     targets: PropTypes.object,
     direction: PropTypes.oneOfType([
         PropTypes.string,

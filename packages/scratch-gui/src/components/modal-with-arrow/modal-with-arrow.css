@@ -33,3 +33,9 @@
     z-index: $z-index-modal;
     border: none;
 }
+
+/* The arrow is drawn in the accent color, so shift it to the cherry hue. */
+[data-color-mode='cherry-light'] .arrow,
+[data-color-mode='cherry-dark'] .arrow {
+    filter: hue-rotate(78deg) saturate(1.05);
+}

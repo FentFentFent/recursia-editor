@@ -71,6 +71,6 @@
 }
 
 /* The submit icon is drawn in the light theme's text color. */
-[data-color-mode='dark'] .question-submit-button-icon {
+[data-color-mode='dark'] .question-submit-button-icon, [data-color-mode='cherry-dark'] .question-submit-button-icon {
     filter: invert(1) hue-rotate(180deg);
 }

@@ -134,6 +134,92 @@
     --extensions-light: hsla(163, 40%, 20%, 1);
     --drop-highlight: hsla(215, 100%, 40%, 1);
 }
+
+:root[data-color-mode='cherry-light'] {
+    --ui-primary: hsla(335, 100%, 96%, 1);
+    --ui-secondary: hsla(335, 80%, 95%, 1);
+    --ui-tertiary: hsla(335, 55%, 90%, 1);
+    --ui-surface: hsla(335, 100%, 99%, 1);
+    --ui-gray: hsla(335, 40%, 95%, 1);
+
+    --ui-blue-10percent: hsla(338, 85%, 58%, 0.1);
+    --ui-blue-25percent: hsla(338, 85%, 58%, 0.25);
+
+    --ui-modal-overlay: hsla(338, 85%, 58%, 0.9);
+    --ui-alert-overlay: hsla(338, 85%, 58%, 0.4);
+
+    --ui-black-transparent: hsla(335, 40%, 16%, 0.15);
+    --ui-shadow: hsla(335, 40%, 16%, 0.15);
+
+    --ui-black: hsla(335, 40%, 8%, 1);
+    --ui-focus-outline: hsla(335, 40%, 8%, 1);
+
+    --ui-alert-orange: hsla(335, 100%, 94%, 1);
+    --text-primary: hsla(335, 22%, 34%, 1);
+    --text-primary-transparent: hsla(335, 22%, 34%, 0.75);
+
+    --motion-primary: hsla(338, 85%, 58%, 1);
+    --motion-tertiary: hsla(338, 75%, 46%, 1);
+
+    --looks-secondary: hsla(338, 70%, 54%, 1);
+    --looks-transparent: hsla(338, 70%, 54%, 0.35);
+    --looks-light-transparent: hsla(338, 70%, 54%, 0.15);
+    --looks-secondary-dark: hsla(338, 70%, 44%, 1);
+
+    --red-primary: hsla(350, 85%, 55%, 1);
+    --red-tertiary: hsla(350, 85%, 45%, 1);
+
+    --sound-primary: hsla(322, 60%, 55%, 1);
+    --sound-tertiary: hsla(322, 55%, 45%, 1);
+
+    --control-primary: hsla(20, 90%, 58%, 1);
+
+    --data-primary: hsla(10, 85%, 56%, 1);
+
+    --error-primary: hsla(10, 85%, 58%, 1);
+    --error-light: hsla(10, 90%, 72%, 1);
+    --error-transparent: hsla(10, 85%, 58%, 0.25);
+
+    --membership-blue: hsla(338, 65%, 46%, 1);
+    --drop-highlight: hsla(338, 100%, 82%, 1);
+}
+
+:root[data-color-mode='cherry-dark'] {
+    /* Keeps the page dark where the app does not cover it. */
+    background-color: hsla(335, 30%, 9%, 1);
+
+    --ui-primary: hsla(335, 25%, 11%, 1);
+    --ui-secondary: hsla(335, 22%, 14%, 1);
+    --ui-tertiary: hsla(335, 18%, 20%, 1);
+    --ui-surface: hsla(335, 18%, 17%, 1);
+    --ui-gray: hsla(335, 18%, 23%, 1);
+    --ui-blue-10percent: hsla(338, 90%, 65%, 0.15);
+    --ui-blue-25percent: hsla(338, 90%, 65%, 0.3);
+
+    --ui-modal-overlay: hsla(335, 45%, 6%, 0.9);
+    --ui-alert-overlay: hsla(335, 45%, 6%, 0.4);
+
+    --ui-white-transparent: hsla(338, 60%, 92%, 0.25);
+    --ui-black-transparent: hsla(338, 60%, 92%, 0.15);
+    --ui-shadow: hsla(335, 50%, 4%, 0.6);
+
+    --ui-focus-outline: hsla(338, 60%, 92%, 1);
+
+    --ui-alert-orange: hsla(338, 45%, 20%, 1);
+    --text-primary: hsla(335, 18%, 87%, 1);
+    --text-primary-transparent: hsla(335, 18%, 87%, 0.75);
+
+    --motion-primary: hsla(338, 80%, 62%, 1);
+    --motion-tertiary: hsla(338, 65%, 48%, 1);
+
+    --looks-secondary: hsla(338, 65%, 56%, 1);
+    --looks-transparent: hsla(338, 65%, 56%, 0.35);
+    --looks-light-transparent: hsla(338, 65%, 56%, 0.15);
+    --looks-secondary-dark: hsla(338, 60%, 46%, 1);
+
+    --extensions-light: hsla(163, 40%, 20%, 1);
+    --drop-highlight: hsla(338, 100%, 45%, 1);
+}
 :global(.injectionDiv svg.blocklySvg pattern[id^="blocklyGridPattern"] line) {
     stroke: #53244fa3 !important;
 }

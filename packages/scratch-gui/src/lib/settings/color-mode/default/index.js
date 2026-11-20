@@ -96,6 +96,8 @@ const blockColors = {
     replacementGlowSize: 2,
     replacementGlowOpacity: 1,
     colourPickerStroke: '#FFFFFF',
+    flyoutButtonBorder: '#C6C6C6',
+    flyoutButtonHover: '#FFFFFF',
     // CSS colours: support RGBA
     fieldShadow: 'rgba(255, 255, 255, 0.3)',
     dropDownShadow: 'rgba(0, 0, 0, .3)',

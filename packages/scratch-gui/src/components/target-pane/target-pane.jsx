@@ -63,6 +63,7 @@ const TargetPane = ({
             selectedId={editingTarget}
             spriteFileInput={fileInputRef}
             sprites={sprites}
+            stage={stage}
             stageSize={stageSize}
             onChangeSpriteDirection={onChangeSpriteDirection}
             onChangeSpriteName={onChangeSpriteName}

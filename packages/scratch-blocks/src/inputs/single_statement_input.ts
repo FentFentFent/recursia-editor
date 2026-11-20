@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import * as Blockly from 'blockly/core'
+import InlineStatementInput from './inline_statement_input'
 
 /**
  * The `args0` type name for a single-statement input.
@@ -18,6 +19,6 @@ export const SINGLE_STATEMENT_INPUT_TYPE = 'input_statement_single'
  * connections that would put a second block into the stack, including a whole
  * stack dropped into the input and anything connected below the block inside it.
  */
-export class SingleStatementInput extends Blockly.inputs.StatementInput {}
+export class SingleStatementInput extends InlineStatementInput {}
 
 Blockly.registry.register(Blockly.registry.Type.INPUT, SINGLE_STATEMENT_INPUT_TYPE, SingleStatementInput)

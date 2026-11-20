@@ -23,6 +23,12 @@ $border-radius: 0.25rem;
     vertical-align: middle;
 }
 
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .edit-field-icon,
+[data-color-mode='cherry-dark'] .edit-field-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 .edit-field-title {
     display: block;
     margin-top: .125rem;

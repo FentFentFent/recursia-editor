@@ -30,6 +30,7 @@
     border-radius: 5px;
     padding: 0 1rem;
     height: 3rem;
+    background-color: var(--ui-surface);
     color: var(--text-primary-transparent);
     font-size: .875rem;
 }
@@ -58,6 +59,7 @@
     border-radius: 0.25rem;
     background: var(--ui-surface);
     border: 1px solid var(--ui-black-transparent);
+    color: var(--text-primary);
     font-weight: 600;
     font-size: 0.85rem;
 }

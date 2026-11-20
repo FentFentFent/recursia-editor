@@ -14,7 +14,6 @@ const mapStateToProps = state => ({vm: state.scratchGui.vm});
 
 const VMBlocks = connect(mapStateToProps)(Blocks);
 const VMControls = connect(mapStateToProps)(Controls);
-
 const BlocksOnly = props => {
     return (<GUI {...props}>
         <VMBlocks

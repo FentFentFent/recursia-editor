@@ -14,6 +14,7 @@ import BlocksComponent from '../components/blocks/blocks.jsx';
 import ExtensionLibrary from './extension-library.jsx';
 import extensionData from '../lib/libraries/extensions/index.jsx';
 import CustomProcedures from './custom-procedures.jsx';
+import CustomExtensionModal from '../components/custom-extension-modal/custom-extension-modal.jsx';
 import errorBoundaryHOC from '../lib/error-boundary-hoc.jsx';
 import {BLOCKS_DEFAULT_SCALE, STAGE_DISPLAY_SIZES} from '../lib/layout-constants';
 import DropAreaHOC from '../lib/drop-area-hoc.jsx';
@@ -30,7 +31,9 @@ import {
 import {connect} from 'react-redux';
 import {updateToolbox} from '../reducers/toolbox';
 import {activateColorPicker} from '../reducers/color-picker';
-import {closeExtensionLibrary, openSoundRecorder, openConnectionModal} from '../reducers/modals';
+import {
+    closeCustomExtensionModal, closeExtensionLibrary, openConnectionModal, openCustomExtensionModal, openSoundRecorder
+} from '../reducers/modals';
 import {activateCustomProcedures, deactivateCustomProcedures} from '../reducers/custom-procedures';
 import {setConnectionModalExtensionId} from '../reducers/connection-modal';
 import {updateMetrics} from '../reducers/workspace-metrics';
@@ -165,6 +168,14 @@ class Blocks extends React.Component {
         toolboxWorkspace.registerButtonCallback('MAKE_A_VARIABLE', varListButtonCallback(''));
         toolboxWorkspace.registerButtonCallback('MAKE_A_LIST', varListButtonCallback('list'));
         toolboxWorkspace.registerButtonCallback('MAKE_A_PROCEDURE', procButtonCallback);
+
+        // The Modules category's "Add Imports" button asks the target pane to
+        // enter the same "select imports" mode as the sprite context menu item.
+        // Register on the main workspace because toolbox updates replace the
+        // flyout workspace, which would drop a callback registered there.
+        this.workspace.registerButtonCallback('ADD_SPRITE_IMPORTS', () => {
+            window.dispatchEvent(new Event('select-imports'));
+        });
 
         // Store the xml of the toolbox that is actually rendered.
         // This is used in componentDidUpdate instead of prevProps, because
@@ -685,6 +696,7 @@ class Blocks extends React.Component {
         const {
             anyModalVisible,
             canUseCloud,
+            customExtensionModalVisible,
             customProceduresVisible,
             extensionLibraryVisible,
             options,
@@ -694,11 +706,13 @@ class Blocks extends React.Component {
             isVisible,
             onActivateColorPicker,
             onOpenConnectionModal,
+            onOpenCustomExtensionModal,
             onOpenSoundRecorder,
             updateToolboxState,
             onActivateCustomProcedures,
             onRequestCloseExtensionLibrary,
             onRequestCloseCustomProcedures,
+            onRequestCloseCustomExtensionModal,
             toolboxXML,
             updateMetrics: updateMetricsProp,
             useCatBlocks,
@@ -732,7 +746,14 @@ class Blocks extends React.Component {
                     <ExtensionLibrary
                         vm={vm}
                         onCategorySelected={this.handleCategorySelected}
+                        onCustomExtensionSelected={onOpenCustomExtensionModal}
                         onRequestClose={onRequestCloseExtensionLibrary}
+                    />
+                ) : null}
+                {customExtensionModalVisible ? (
+                    <CustomExtensionModal
+                        vm={this.props.vm}
+                        onClose={onRequestCloseCustomExtensionModal}
                     />
                 ) : null}
                 {customProceduresVisible ? (
@@ -752,6 +773,7 @@ class Blocks extends React.Component {
 Blocks.propTypes = {
     anyModalVisible: PropTypes.bool,
     canUseCloud: PropTypes.bool,
+    customExtensionModalVisible: PropTypes.bool,
     customProceduresVisible: PropTypes.bool,
     extensionLibraryVisible: PropTypes.bool,
     isRtl: PropTypes.bool,
@@ -761,7 +783,9 @@ Blocks.propTypes = {
     onActivateColorPicker: PropTypes.func,
     onActivateCustomProcedures: PropTypes.func,
     onOpenConnectionModal: PropTypes.func,
+    onOpenCustomExtensionModal: PropTypes.func,
     onOpenSoundRecorder: PropTypes.func,
+    onRequestCloseCustomExtensionModal: PropTypes.func,
     onRequestCloseCustomProcedures: PropTypes.func,
     onRequestCloseExtensionLibrary: PropTypes.func,
     options: PropTypes.shape({
@@ -820,6 +844,7 @@ const mapStateToProps = state => ({
         state.scratchGui.mode.isFullScreen
     ),
     extensionLibraryVisible: state.scratchGui.modals.extensionLibrary,
+    customExtensionModalVisible: state.scratchGui.modals.customExtension,
     isRtl: state.locales.isRtl,
     locale: state.locales.locale,
     messages: state.locales.messages,
@@ -839,6 +864,12 @@ const mapDispatchToProps = dispatch => ({
     onOpenSoundRecorder: () => {
         dispatch(activateTab(SOUNDS_TAB_INDEX));
         dispatch(openSoundRecorder());
+    },
+    onOpenCustomExtensionModal: () => {
+        dispatch(openCustomExtensionModal());
+    },
+    onRequestCloseCustomExtensionModal: () => {
+        dispatch(closeCustomExtensionModal());
     },
     onRequestCloseExtensionLibrary: () => {
         dispatch(closeExtensionLibrary());

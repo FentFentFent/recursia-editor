@@ -219,6 +219,6 @@
 }
 
 /* The requirement icons are drawn in the light theme's text color. */
-[data-color-mode='dark'] .featured-extension-metadata-detail img {
+[data-color-mode='dark'] .featured-extension-metadata-detail img, [data-color-mode='cherry-dark'] .featured-extension-metadata-detail img {
     filter: invert(1) hue-rotate(180deg);
 }

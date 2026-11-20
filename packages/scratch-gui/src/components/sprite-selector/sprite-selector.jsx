@@ -67,6 +67,7 @@ const SpriteSelectorComponent = function (props) {
         selectedId,
         spriteFileInput,
         sprites,
+        stage,
         stageSize,
         ...componentProps
     } = props;
@@ -86,6 +87,7 @@ const SpriteSelectorComponent = function (props) {
             <SpriteInfo
                 dependencies={selectedSprite.dependencies}
                 sprites={sprites}
+                stage={stage}
                 direction={selectedSprite.direction}
                 disabled={spriteInfoDisabled}
                 name={selectedSprite.name}
@@ -179,6 +181,10 @@ SpriteSelectorComponent.propTypes = {
     onSurpriseSpriteClick: PropTypes.func,
     raised: PropTypes.bool,
     selectedId: PropTypes.string,
+    stage: PropTypes.shape({
+        id: PropTypes.string,
+        name: PropTypes.string
+    }),
     spriteFileInput: PropTypes.func,
     sprites: PropTypes.shape({
         id: PropTypes.shape({

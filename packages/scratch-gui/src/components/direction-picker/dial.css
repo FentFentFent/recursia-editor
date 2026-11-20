@@ -38,3 +38,9 @@ $dial-size: 40px;
     stroke: var(--looks-secondary);
     stroke-width: 1px;
 }
+
+/* The handle is drawn in the accent color, so shift it to the cherry hue. */
+[data-color-mode='cherry-light'] .dial-handle,
+[data-color-mode='cherry-dark'] .dial-handle {
+    filter: hue-rotate(78deg) saturate(1.05);
+}

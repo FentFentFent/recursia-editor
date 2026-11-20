@@ -392,7 +392,7 @@ const styles = `
   }
 
   .blocklyFlyoutButtonBackground {
-      stroke: #c6c6c6;
+      stroke: var(--colour-flyoutButtonBorder, #c6c6c6);
   }
 
   .blocklyFlyoutButtonShadow {
@@ -400,7 +400,7 @@ const styles = `
   }
 
   .blocklyFlyoutButton:hover {
-    fill: white;
+    fill: var(--colour-flyoutButtonHover, white);
     cursor: pointer;
   }
 
@@ -441,8 +441,7 @@ const styles = `
     filter: invert(1);
   }
 
-  .scratch-renderer.default-theme .blocklyFlyoutButton .blocklyText,
-  .scratch-renderer.high-contrast-theme .blocklyFlyoutButton .blocklyText {
+  .scratch-renderer .blocklyFlyoutButton .blocklyText {
     fill: var(--colour-textFieldText);
   }
 

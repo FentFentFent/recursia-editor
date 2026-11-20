@@ -71,6 +71,12 @@
     filter: none;
 }
 
+/* The selected icons keep their accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .button[aria-pressed='true'] > img,
+[data-color-mode='cherry-dark'] .button[aria-pressed='true'] > img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 /* pressed button styling */
 
 .button:active {

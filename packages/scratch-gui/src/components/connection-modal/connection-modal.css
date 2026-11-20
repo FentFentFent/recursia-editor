@@ -335,6 +335,12 @@
 [dir="ltr"] .button-icon-right {
     margin-left: 0.5rem;
 }
+
+/* The button icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .connection-button img,
+[data-color-mode='cherry-dark'] .connection-button img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
 [dir="rtl"] .button-icon-right {
     margin-right: 0.5rem;
 }
@@ -446,6 +452,6 @@
     width: inherit;
 }
 
-[data-color-mode='dark'] .signal-bar {
+[data-color-mode='dark'] .signal-bar, [data-color-mode='cherry-dark'] .signal-bar {
     background-color: var(--ui-tertiary);
 }

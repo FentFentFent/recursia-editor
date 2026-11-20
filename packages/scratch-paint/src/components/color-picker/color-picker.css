@@ -113,3 +113,9 @@
 [dir="rtl"] .gradient-swatches-row {
     flex-direction: row-reverse;
 }
+
+/* The gradient type icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .gradient-picker-row > img,
+[data-color-mode='cherry-dark'] .gradient-picker-row > img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}

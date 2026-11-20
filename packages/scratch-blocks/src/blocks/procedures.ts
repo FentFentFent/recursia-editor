@@ -1140,7 +1140,7 @@ Blockly.Blocks.procedures_definition = {
             message0: Blockly.Msg.PROCEDURES_DEFINITION,
             args0: [
                 {
-                    type: 'input_statement',
+                    type: 'input_statement_single',
                     name: 'custom_block',
                 },
             ],

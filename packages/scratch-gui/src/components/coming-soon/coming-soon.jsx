@@ -13,17 +13,17 @@ import coolCatIcon from './cool-cat.png';
 
 const messages = defineMessages({
     message1: {
-        defaultMessage: 'Don\'t worry, we\'re on it {emoji}',
+        defaultMessage: 'Nrn',
         description: 'One of the "coming soon" random messages for yet-to-be-done features',
         id: 'gui.comingSoon.message1'
     },
     message2: {
-        defaultMessage: 'Coming Soon...',
+        defaultMessage: 'Nrn',
         description: 'One of the "coming soon" random messages for yet-to-be-done features',
         id: 'gui.comingSoon.message2'
     },
     message3: {
-        defaultMessage: 'We\'re working on it {emoji}',
+        defaultMessage: 'Nrn',
         description: 'One of the "coming soon" random messages for yet-to-be-done features',
         id: 'gui.comingSoon.message3'
     }
@@ -115,11 +115,6 @@ const ComingSoonTooltip = props => (
         >
             {props.children}
         </div>
-        <ComingSoon
-            className={props.tooltipClassName}
-            place={props.place}
-            tooltipId={props.tooltipId}
-        />
     </div>
 );
 

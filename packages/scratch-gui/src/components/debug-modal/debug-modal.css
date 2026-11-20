@@ -176,6 +176,6 @@
     text-align: inherit;
 }
 
-[data-color-mode='dark'] .topic-item.active {
+[data-color-mode='dark'] .topic-item.active, [data-color-mode='cherry-dark'] .topic-item.active {
     background-color: var(--extensions-light);
 }

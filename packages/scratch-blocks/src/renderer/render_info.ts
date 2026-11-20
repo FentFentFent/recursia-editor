@@ -7,6 +7,9 @@ import { getBlockCorners } from '../style/block_corners'
 import { getBlockPadding } from '../style/block_padding'
 import { BowlerHat } from './bowler_hat'
 import { ConstantProvider } from './constants'
+import InlineStatementInput from '../inputs/inline_statement_input'
+import InlineStatementMeasurable from './inline_statement_measurable'
+import { SingleStatementInput } from '../inputs/single_statement_input'
 
 // Blockly's BlockSvg types previousConnection and nextConnection as non-null,
 // but blocks without those connectors have them as null at runtime. This type
@@ -74,7 +77,34 @@ export class RenderInfo extends Blockly.zelos.RenderInfo {
     hat.width = this.width
     this.topRow.measure()
   }
+    override addInput_(
+        input: Blockly.Input,
+        activeRow: Blockly.blockRendering.Row,
+    ) {
+        if (input instanceof InlineStatementInput || input instanceof SingleStatementInput) {
+            activeRow.elements.push(
+                new InlineStatementMeasurable(this.constants_,input),
+            )
 
+            activeRow.hasInlineInput = true
+
+            activeRow.align ??= input.align;
+
+            return
+        }
+
+        super.addInput_(input,activeRow)
+    }
+    override shouldStartNewRow_(
+        currInput: Blockly.Input,
+        prevInput: Blockly.Input,
+    ): boolean {
+        if (currInput instanceof InlineStatementInput || currInput instanceof SingleStatementInput) {
+            return false
+        }
+
+        return super.shouldStartNewRow_(currInput,prevInput)
+    }
   override getInRowSpacing_(
     prev: Blockly.blockRendering.Measurable | null,
     next: Blockly.blockRendering.Measurable | null,

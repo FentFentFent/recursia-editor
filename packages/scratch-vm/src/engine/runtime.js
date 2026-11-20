@@ -1805,6 +1805,11 @@ class Runtime extends EventEmitter {
             target.blocks;
 
         thread.pushStack(id);
+        // Running a procedure definition directly starts one function scope.
+        const topBlock = thread.blockContainer.getBlock(id);
+        if (topBlock && topBlock.opcode === 'procedures_definition') {
+            thread.startFunctionScope();
+        }
         this.threads.push(thread);
         return thread;
     }

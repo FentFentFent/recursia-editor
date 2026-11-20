@@ -127,6 +127,14 @@ $border-radius: 0.25rem;
     margin-right: calc(2 * $grid-unit);
 }
 
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .button-group-button-icon,
+[data-color-mode='cherry-dark'] .button-group-button-icon,
+[data-color-mode='cherry-light'] .menu-item-icon,
+[data-color-mode='cherry-dark'] .menu-item-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
 [dir="rtl"] .menu-item-icon {
     margin-right: 0;
     margin-left: calc(2 * $grid-unit);

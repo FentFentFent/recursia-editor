@@ -3,6 +3,7 @@ const log = require('../util/log');
 const maybeFormatMessage = require('../util/maybe-format-message');
 
 const BlockType = require('./block-type');
+const { newApi } = require('./extension-api/api.js');
 
 // These extensions are currently built into the VM repository but should not be loaded at startup.
 // TODO: move these out into a separate repository?
@@ -24,7 +25,8 @@ const builtinExtensions = {
     makeymakey: () => require('../extensions/scratch3_makeymakey'),
     boost: () => require('../extensions/scratch3_boost'),
     gdxfor: () => require('../extensions/scratch3_gdx_for'),
-    faceSensing: () => require('../extensions/scratch3_face_sensing')
+    faceSensing: () => require('../extensions/scratch3_face_sensing'),
+    tempvars: () => require('../extensions/scratch3_tempvars')
 };
 
 /**
@@ -60,7 +62,7 @@ const builtinExtensions = {
  */
 
 class ExtensionManager {
-    constructor (runtime) {
+    constructor (vm) {
         /**
          * The ID number to provide to the next extension worker.
          * @type {int}
@@ -92,7 +94,26 @@ class ExtensionManager {
          * TODO: remove this in favor of extensions accessing the runtime as a service.
          * @type {Runtime}
          */
-        this.runtime = runtime;
+        this.runtime = vm.runtime;
+
+        /**
+         * Keep a reference to the VM so we can construct unsandboxed extension objects.
+         */
+        this.vm = vm;
+
+        /**
+         * The ScratchBlocks namespace provided by the host, if it has been loaded yet.
+         * @type {?object}
+         * @private
+         */
+        this._scratchBlocks = null;
+
+        /**
+         * Resolvers for extensions waiting for the host to provide ScratchBlocks.
+         * @type {Array.<Function>}
+         * @private
+         */
+        this._scratchBlocksResolvers = [];
 
         dispatch.setService('extensions', this).catch(e => {
             log.error(`ExtensionManager was unable to register extension service: ${JSON.stringify(e)}`);
@@ -112,7 +133,7 @@ class ExtensionManager {
 
     /**
      * Synchronously load an internal extension (core or non-core) by ID. This call will
-     * fail if the provided id is not does not match an internal extension.
+     * fail if the provided id  does not match an internal extension.
      * @param {string} extensionId - the ID of an internal extension
      */
     loadExtensionIdSync (extensionId) {
@@ -235,6 +256,64 @@ class ExtensionManager {
         dispatch.setServiceSync(serviceName, extensionObject);
         dispatch.callSync('extensions', 'registerExtensionServiceSync', serviceName);
         return serviceName;
+    }
+    /**
+     * Register a custom un-sandboxed extension. used by the extension API.
+     * This is a 1:1 copy of _registerInternalExtension, it may however grow in the future.
+     * Do not reduce this behavior to a call to _registerInternalExtension because of that fact.
+     * 
+     * @param {object} extensionObject - Extension to register
+     */
+    registerExtensionObjectSync(extensionObject) {
+        const extensionInfo = extensionObject.getInfo();
+        const fakeWorkerId = this.nextExtensionWorker++;
+        const serviceName = `extension_${ fakeWorkerId }_${ extensionInfo.id }`;
+        dispatch.setServiceSync(serviceName,extensionObject);
+        dispatch.callSync('extensions','registerExtensionServiceSync',serviceName);
+    }
+
+    /**
+     * Provide the ScratchBlocks namespace used to build the blocks workspace. The host calls this
+     * once ScratchBlocks is loaded, which may be long after extensions were loaded in a player-only
+     * view. Extensions waiting on the namespace are resolved immediately.
+     * @param {object} ScratchBlocks - the ScratchBlocks namespace.
+     */
+    setScratchBlocks (ScratchBlocks) {
+        if (ScratchBlocks === this._scratchBlocks) return;
+        this._scratchBlocks = ScratchBlocks;
+        const resolvers = this._scratchBlocksResolvers;
+        this._scratchBlocksResolvers = [];
+        for (const resolve of resolvers) {
+            resolve(ScratchBlocks);
+        }
+    }
+
+    /**
+     * Get a promise for the ScratchBlocks namespace. It resolves immediately once the host has
+     * provided ScratchBlocks, otherwise when the host next calls setScratchBlocks.
+     * @returns {Promise.<object>} a promise for the ScratchBlocks namespace.
+     */
+    getScratchBlocks () {
+        if (this._scratchBlocks) return Promise.resolve(this._scratchBlocks);
+        return new Promise(resolve => {
+            this._scratchBlocksResolvers.push(resolve);
+        });
+    }
+
+    /**
+     * Run javascript unsandboxed as a custom extension.
+     * @param {*} sourceCode 
+     */
+    loadExtensionSource(sourceCode) {
+
+        const ScratchAPI = newApi(this.vm, () => this.getScratchBlocks());
+
+        const SourceFnc = new Function('Scratch','isRecursia',sourceCode);
+        try {
+            SourceFnc(ScratchAPI,ScratchAPI.extensions.isRecursia);
+        } catch (e) {
+            log.error(e);
+        }
     }
 
     /**

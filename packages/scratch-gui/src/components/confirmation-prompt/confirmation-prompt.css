@@ -71,3 +71,9 @@
     height: 1.5rem;
     width: 1.5rem;
 }
+
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .button-icon,
+[data-color-mode='cherry-dark'] .button-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}

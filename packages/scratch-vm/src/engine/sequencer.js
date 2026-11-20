@@ -434,6 +434,7 @@ class Sequencer {
 
         calleeThread.pushStack(null);
         calleeThread.pushStack(definition);
+        calleeThread.startFunctionScope();
 
         // Transfer parameters from the procedure call: the callee does not
         // share the caller's stack, so the values move onto the call frame.
@@ -581,6 +582,7 @@ class Sequencer {
         // When that set of blocks finishes executing, it will be popped
         // from the stack by the sequencer, returning control to the caller.
         thread.pushStack(definition);
+        thread.startFunctionScope();
         // In known warp-mode threads, only yield when time is up.
         if (thread.peekStackFrame().warpMode &&
             thread.warpTimer.timeElapsed() > Sequencer.WARP_TIME) {

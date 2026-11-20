@@ -124,3 +124,9 @@ svg.record-button {
 [dir="rtl"] .rerecord-button img {
     transform: scaleX(-1);
 }
+
+/* The control icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .main-button-row img,
+[data-color-mode='cherry-dark'] .main-button-row img {
+    filter: hue-rotate(78deg) saturate(1.05);
+}

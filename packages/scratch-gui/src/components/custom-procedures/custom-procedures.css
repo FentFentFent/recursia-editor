@@ -75,7 +75,7 @@
 }
 
 /* Checkboxes are drawn by the browser, so they need to be told to render dark. */
-[data-color-mode='dark'] .checkbox-row input[type="checkbox"] {
+[data-color-mode='dark'] .checkbox-row input[type="checkbox"], [data-color-mode='cherry-dark'] .checkbox-row input[type="checkbox"] {
     color-scheme: dark;
     accent-color: var(--looks-secondary);
 }

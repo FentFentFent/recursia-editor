@@ -192,7 +192,7 @@ const alerts = [
         clearList: [],
         content: (
             <FormattedMessage
-                defaultMessage="select the sprite to import, selected already imported sprites to remove their import"
+                defaultMessage="select the sprite to import, select already imported sprites to remove their import"
                 description="Message indicating set dependencies mode"
                 id="gui.alerts.setDependencies"
             />

@@ -46,6 +46,7 @@ class TargetPane extends React.Component {
             'handleDuplicateSprite',
             'handleExportSprite',
             'handleSetDependenciesSprite',
+            'handleSelectImports',
             'handleNewSprite',
             'handleNewSpriteClick',
             'handleSelectSprite',
@@ -64,9 +65,11 @@ class TargetPane extends React.Component {
     }
     componentDidMount () {
         this.props.vm.addListener('BLOCK_DRAG_END', this.handleBlockDragEnd);
+        window.addEventListener('select-imports', this.handleSelectImports);
     }
     componentWillUnmount () {
         this.props.vm.removeListener('BLOCK_DRAG_END', this.handleBlockDragEnd);
+        window.removeEventListener('select-imports', this.handleSelectImports);
     }
 
     static contextType = ModalFocusContext;
@@ -134,6 +137,13 @@ class TargetPane extends React.Component {
         this.setState({dependenciesSourceId: id});
         if (this.props.onShowSetDependenciesAlert) {
             this.props.onShowSetDependenciesAlert();
+        }
+    }
+    handleSelectImports () {
+        // The Modules category's "Add Imports" button selects imports for the
+        // sprite currently being edited.
+        if (this.props.editingTarget) {
+            this.handleSetDependenciesSprite(this.props.editingTarget);
         }
     }
     handleSelectSprite (id) {

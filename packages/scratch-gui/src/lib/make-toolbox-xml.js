@@ -771,6 +771,12 @@ const myBlocks = function (isInitialSetup,isStage,targetId,colors) {
 };
 
 const modules = function (isInitialSetup,isStage,targetId,colors) {
+    // The stage has no sprite imports to select, so only sprites get the button.
+    const addImportsButton = isStage ? '' : `
+        <button
+            text="Add Imports for this Sprite"
+            callbackkey="ADD_SPRITE_IMPORTS"
+        ></button>`;
     return `
         <category
             name="${ ScratchBlocks.ScratchMsgs.translate(
@@ -783,8 +789,7 @@ const modules = function (isInitialSetup,isStage,targetId,colors) {
             >
         <block type="modules_single_export"></block>
         <block type="modules_reporter_export"></block>
-        <block type="modules_export"></block>
-    
+        <block type="modules_export"></block>${addImportsButton}
     </category>
     `;
 };

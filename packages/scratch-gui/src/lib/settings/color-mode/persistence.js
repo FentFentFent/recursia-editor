@@ -1,13 +1,19 @@
 import cookie from 'cookie';
 
-import {DARK_MODE, DEFAULT_MODE, HIGH_CONTRAST_MODE} from '.';
+import {CHERRY_DARK_MODE, CHERRY_LIGHT_MODE, DARK_MODE, DEFAULT_MODE, HIGH_CONTRAST_MODE} from '.';
 
 const PREFERS_HIGH_CONTRAST_QUERY = '(prefers-contrast: more)';
 // Technically what we are persisting is the color mode, but for historical reasons,
 // we should continue using 'scratchtheme' as the cookie key.
 const COOKIE_KEY = 'scratchtheme';
 
-const isValidColorMode = colorMode => [DEFAULT_MODE, HIGH_CONTRAST_MODE, DARK_MODE].includes(colorMode);
+const isValidColorMode = colorMode => [
+    DEFAULT_MODE,
+    HIGH_CONTRAST_MODE,
+    DARK_MODE,
+    CHERRY_LIGHT_MODE,
+    CHERRY_DARK_MODE
+].includes(colorMode);
 
 const systemPreferencesColorMode = () => {
     if (window.matchMedia && window.matchMedia(PREFERS_HIGH_CONTRAST_QUERY).matches) return HIGH_CONTRAST_MODE;

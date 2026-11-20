@@ -61,6 +61,14 @@ class _StackFrame {
          * @type {object}
          */
         this.executionContext = null;
+
+        /**
+         * Variables owned by the procedure body running above this frame, or
+         * null when this frame is not a procedure definition. Dropping the
+         * frame drops the variables with it.
+         * @type {?object}
+         */
+        this.functionVariables = null;
     }
 
     /**
@@ -77,6 +85,7 @@ class _StackFrame {
         this.waitingReporter = null;
         this.params = null;
         this.executionContext = null;
+        this.functionVariables = null;
 
         return this;
     }
@@ -87,7 +96,11 @@ class _StackFrame {
      * @returns {_StackFrame} this
      */
     reuse (warpMode = this.warpMode) {
+        // The blocks of a procedure body reuse the frame the definition
+        // started on, so the body's variables stay on the frame with it.
+        const functionVariables = this.functionVariables;
         this.reset();
+        this.functionVariables = functionVariables;
         this.warpMode = Boolean(warpMode);
         return this;
     }
@@ -299,6 +312,14 @@ class Thread {
             this.requestScriptGlowInFrame = false;
             this.status = Thread.STATUS_DONE;
         }
+    }
+
+    /**
+     * Start a function scope on the current stack frame. The frame carries the
+     * scope from the procedure definition into the blocks of its body.
+     */
+    startFunctionScope () {
+        this.peekStackFrame().functionVariables = Object.create(null);
     }
 
     /**

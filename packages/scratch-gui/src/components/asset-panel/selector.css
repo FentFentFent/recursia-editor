@@ -92,6 +92,6 @@ $fade-out-distance: 100px;
     filter: opacity(15%) brightness(0%);
 }
 
-[data-color-mode='dark'] .new-buttons:before {
+[data-color-mode='dark'] .new-buttons:before, [data-color-mode='cherry-dark'] .new-buttons:before {
     background: linear-gradient(rgba(0, 0, 0, 0), var(--ui-surface));
 }

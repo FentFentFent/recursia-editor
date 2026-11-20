@@ -88,3 +88,12 @@
 [data-color-mode='dark'] .stage-button-icon {
     filter: invert(1) hue-rotate(180deg);
 }
+
+/* The icons are drawn in the accent color, so shift them to the cherry hue. */
+[data-color-mode='cherry-light'] .stage-button-icon {
+    filter: hue-rotate(78deg) saturate(1.05);
+}
+
+[data-color-mode='cherry-dark'] .stage-button-icon {
+    filter: invert(1) hue-rotate(258deg);
+}
