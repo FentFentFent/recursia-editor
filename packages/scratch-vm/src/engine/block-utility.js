@@ -1,5 +1,6 @@
 const Thread = require('./thread');
 const Timer = require('../util/timer');
+const log = require('../util/log');
 
 /**
  * @file
@@ -122,6 +123,37 @@ class BlockUtility {
      */
     startBranch (branchNum, isLoop) {
         this.sequencer.stepToBranch(this.thread, branchNum, isLoop);
+    }
+
+    /**
+     * Run the blocks connected to a block input argument, such as a single
+     * block or inline stack input. The blocks run on the calling block's
+     * thread, and the calling block's script continues after them.
+     * @param {object} blockInput The block input argument, e.g. `args.STACK`.
+     */
+    startBlockInput (blockInput) {
+        const blockId = blockInput && blockInput.blockId;
+        if (!blockId) return;
+        this.thread.pushStack(blockId);
+    }
+
+    /**
+     * Get the block connected to a block input argument, such as a single
+     * block or inline stack input.
+     * @param {object} blockInput The block input argument, e.g. `args.STACK`.
+     * @returns {?object} The first block connected to the input, or null when
+     *     the input is empty.
+     */
+    resolveBlockInputToBlock (blockInput) {
+        const blockId = blockInput && blockInput.blockId;
+        if (!blockId) return null;
+
+        const block = this.thread.target.blocks.getBlock(blockId);
+        if (typeof block === 'undefined') {
+            log.warn(`BlockUtility.resolveBlockInputToBlock: target ${this.thread.target.id} has no block ${blockId}`);
+            return null;
+        }
+        return block;
     }
 
     /**

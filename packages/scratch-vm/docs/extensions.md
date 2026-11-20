@@ -8,7 +8,7 @@ extension specification.
 There are four types of extensions that can define everything from the Scratch's core library (such as the "Looks" and
 "Operators" categories) to unofficial extensions that can be loaded from a remote URL.
 
-**Scratch 3.0 does not yet support unofficial extensions.**
+**Official Scratch 3.0 does not yet support unofficial extensions, Recursia does.**
 
 |                                | Core | Team | Official | Unofficial |
 | ------------------------------ | ---- | ---- | -------- | ---------- |
@@ -16,11 +16,12 @@ There are four types of extensions that can define everything from the Scratch's
 | Maintained by Scratch Team     | √    | √    | O        | X          |
 | Shown in Library               | X    | √    | √        | X          |
 | Sandboxed                      | X    | X    | √        | √          |
+| Unsandboxed                    | √    | √    | X        | O          |
 | Can save projects to community | √    | √    | √        | X          |
 
 ## JavaScript Environment
 
-Most Scratch 3.0 is written using JavaScript features not yet commonly supported by browsers. For compatibility we
+Most of Scratch 3.0 is written using JavaScript features not yet commonly supported by browsers. For compatibility we
 transpile the code to ES5 before publishing or deploying. Any extension included in the `scratch-vm` repository may
 use ES6+ features and may use `require` to reference other code within the `scratch-vm` repository.
 
@@ -129,6 +130,8 @@ circular dial
 - Note - a numeric input which can select a musical note. This field has additional UI to select a note from a
 visual keyboard.
 - Image - an inline image displayed on a block. This is a special argument type in that it does not represent a value and does not accept other blocks to be plugged-in in place of this block field. See the section below about "Adding an Inline Image".
+- Single Block - an inline slot which accepts one block. The blocks inside that block, such as the ones in its C-shape, may still exist. See the section below about "Running the Blocks in a Stack Input".
+- Inline Stack - an inline slot which accepts a single block or a stack of blocks. This is an alternative to C-shape branches See the section below about "Running the Blocks in a Stack Input".
 
 #### Adding an Inline Image
 In addition to specifying block arguments (an example of string arguments shown in the code snippet above),
@@ -154,8 +157,33 @@ return {
 }
 ```
 
+#### Running the Blocks in a Stack Input
 
+The `SINGLE_BLOCK` and `INLINE_STACK` arguments do not report a value. Instead, the implementation receives an object
+which describes the blocks connected to the input:
 
+```js
+{
+    blockId: 'blockidinvmandscratchblocks', // null when nothing is connected
+    type: 'InlineStack' // 'InlineStack' or 'SingleBlock'
+}
+```
+
+The connected blocks do not run on their own. The block implementation runs them when it wants to, using these
+`BlockUtility` methods:
+
+- `util.startBlockInput(blockInput)` - runs the blocks connected to the input on the calling block's thread, then
+  continues with the block that follows the caller.
+- `util.resolveBlockInputToBlock(blockInput)` - returns the first block connected to the input, or `null` when the
+  input is empty.
+
+```js
+exampleWithStack (args, util) {
+    if (util.resolveBlockInputToBlock(args.STACK)) {
+        util.startBlockInput(args.STACK);
+    }
+}
+```
 
 #### Defining a Menu
 

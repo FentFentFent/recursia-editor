@@ -129,7 +129,6 @@ class TargetPane extends React.Component {
     }
     handleSetDependenciesSprite (id) {
         // Enter "set dependencies" mode for the selected sprite.
-        console.log('set dependencies requested for sprite', id);
         this.props.vm.setEditingTarget(id);
         if (this.props.stage && id !== this.props.stage.id) {
             this.props.onHighlightTarget(id);

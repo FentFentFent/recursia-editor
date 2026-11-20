@@ -57,6 +57,19 @@ class Scratch3CoreExample {
                     }
                 },
                 {
+                    opcode: 'exampleWithNewInputs',
+                    blockType: BlockType.COMMAND,
+                    text: 'block with inline-stack: [INLINESTACK] and single-block: [SINGLEBLOCK] inputs',
+                    arguments: {
+                        INLINESTACK: {
+                            type: ArgumentType.INLINE_STACK
+                        },
+                        SINGLEBLOCK: {
+                            type: ArgumentType.SINGLE_BLOCK
+                        },
+                    }
+                },
+                {
                     blockType: BlockType.LABEL,
                     text: 'Style shapes'
                 },
@@ -135,7 +148,18 @@ class Scratch3CoreExample {
         const stage = this.runtime.getTargetForStage();
         return stage ? stage.getName() : 'no stage yet';
     }
-
+    /**
+     * Example block with a single block input and an inline stack input. The
+     * blocks connected to an input only run when the implementation asks for
+     * them, so this block runs both inputs.
+     * @param {object} args Block arguments.
+     * @param {BlockUtility} util Block utility.
+     */
+    exampleWithNewInputs (args, util) {
+        // Only one of these will run, the one that does is the one that is connected, or the first available if both are.
+        util.startBlockInput(args.SINGLEBLOCK);
+        util.startBlockInput(args.INLINESTACK);
+    }
     exampleWithInlineImage () {
         return;
     }

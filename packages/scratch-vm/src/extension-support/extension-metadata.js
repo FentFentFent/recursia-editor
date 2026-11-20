@@ -17,6 +17,7 @@
  * @property {string} [func] - the name of the function implementing this block. Can be shared by other blocks/opcodes.
  * @property {BlockType} blockType - the type of block (command, reporter, label, etc.) being described.
  * @property {string} [text] - the text on the block, with [PLACEHOLDERS] for arguments. For a LABEL entry, the
+ * @property {'any'|'string'|'number'|'boolean'|undefined} [returnType] - The optional return type of a BlockType.REPORTER block, left undefined will give 'string' by default.
  * text displayed on the label.
  * @property {string} [xml] - for an XML entry, the Blockly XML inserted into the block palette.
  * @property {boolean} [hideFromPalette] - true if this block should not appear in the block palette.

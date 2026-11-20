@@ -7,6 +7,8 @@ const TargetType = require('../target-type.js');
 const Cast = require('../../util/cast.js');
 const uid = require('../../util/uid.js');
 const Color = require('../../util/color.js');
+const ReturnType = require('../return-type.js');
+const BlockInputType = require('../block-input-type.js');
 
 
 
@@ -33,6 +35,8 @@ function newApi(vm,getBlockly) {
     Scratch.StyleShape = StyleShape;
     Scratch.ReporterScope = ReporterScope;
     Scratch.TargetType = TargetType;
+    Scratch.ReturnType = ReturnType;
+    Scratch.BlockInputType = BlockInputType;
     Scratch.runtime = vm.runtime;
     Scratch.Cast = Cast;
     Scratch.Color = Color;

@@ -41,7 +41,16 @@ const ArgumentType = {
     /**
      * Inline image on block (as part of the label)
      */
-    IMAGE: 'image'
+    IMAGE: 'image',
+    /**
+     * A single block input, which accepts one block per input slot. Children of
+     * that block, such as the blocks inside its C-shape, may still exist.
+     */
+    SINGLE_BLOCK: 'single_block',
+    /**
+     * A stack input, which accepts one block or a stack of blocks.
+     */
+    INLINE_STACK: 'inline_block_stack',
 };
 
 module.exports = Object.freeze(ArgumentType);

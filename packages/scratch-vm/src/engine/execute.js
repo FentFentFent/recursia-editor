@@ -4,6 +4,7 @@ const log = require('../util/log');
 const Thread = require('./thread');
 const { Map } = require('immutable');
 const cast = require('../util/cast');
+const ArgumentType = require('../extension-support/argument-type');
 
 /**
  * Single BlockUtility instance reused by execute for every pritimive ran.
@@ -34,6 +35,18 @@ const isPromise = function (value) {
         typeof value === 'object' &&
         typeof value.then === 'function'
     );
+};
+
+/**
+ * Argument types whose inputs hold blocks instead of a value. Blocks plugged
+ * into one of these inputs are not run with the block that owns the input:
+ * the block implementation receives a description of the input and runs its
+ * blocks itself through BlockUtility.
+ * @constant {Object.<string, string>}
+ */
+const blockInputTypes = {
+    [ArgumentType.SINGLE_BLOCK]: 'SingleBlock',
+    [ArgumentType.INLINE_STACK]: 'InlineStack'
 };
 
 /**
@@ -339,11 +352,31 @@ class BlockCached {
             }
         }
 
+        // Inputs that hold blocks are described to the block implementation
+        // instead of being run as part of this block's operations.
+        const blockInputs = Object.create(null);
+        const blockArguments = runtime.getBlockArguments(opcode);
+        for (const argumentName in blockArguments) {
+            const blockInputType = blockInputTypes[blockArguments[argumentName].type];
+            if (blockInputType) {
+                const input = this._inputs[argumentName];
+                blockInputs[argumentName] = true;
+                this._argValues[argumentName] = {
+                    blockId: (input && input.block) || null,
+                    type: blockInputType
+                };
+            }
+        }
+
         // Cache all input children blocks in the operation lists. The
         // operations can later be run in the order they appear in correctly
         // executing the operations quickly in a flat loop instead of needing to
         // recursively iterate them.
         for (const inputName in this._inputs) {
+            if (blockInputs[inputName]) {
+                continue;
+            }
+
             const input = this._inputs[inputName];
             if (input.block) {
                 const inputCached = BlocksExecuteCache.getCached(blockContainer,input.block,BlockCached);

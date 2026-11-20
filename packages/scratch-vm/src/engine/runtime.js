@@ -181,6 +181,17 @@ let stepThreadsProfilerId = -1;
 let rendererDrawProfilerId = -1;
 
 /**
+ * Valid values under the ExtensionBlockMetadata.returnType property.
+ */
+const EXTENSION_RETURN_TYPES = {
+    [undefined]: null,
+    'any': null,
+    'string': 'String',
+    'number': 'Number',
+    'bool': 'Boolean',
+}
+
+/**
  * Manages targets, scripts, and the sequencer.
  * @class
  */
@@ -250,6 +261,13 @@ class Runtime extends EventEmitter {
          * @type {Object.<string, Object>}
          */
         this._hats = {};
+
+        /**
+         * Map to look up the arguments declared by extension blocks.
+         * Keys are opcodes, values are argument metadata by argument name.
+         * @type {Object.<string, Object>}
+         */
+        this._blockArguments = {};
 
         /**
          * A list of script block IDs that were glowing during the previous frame.
@@ -956,6 +974,7 @@ class Runtime extends EventEmitter {
                     if (blockInfo.blockType !== BlockType.EVENT) {
                         this._primitives[opcode] = convertedBlock.info.func;
                     }
+                    this._blockArguments[opcode] = convertedBlock.info.arguments || {};
                     if (blockInfo.blockType === BlockType.EVENT || blockInfo.blockType === BlockType.HAT) {
                         this._hats[opcode] = {
                             edgeActivated: blockInfo.isEdgeActivated,
@@ -1164,8 +1183,8 @@ class Runtime extends EventEmitter {
             }
             break;
         case BlockType.REPORTER:
-            blockJSON.output = 'String'; // TODO: distinguish number & string here?
-            blockJSON.outputShape = ScratchBlocksConstants.OUTPUT_SHAPE_ROUND;
+            blockJSON.output = blockInfo?.returnType ? EXTENSION_RETURN_TYPES[blockInfo.returnType] : 'String'; // TODO: distinguish number & string here?
+            blockJSON.outputShape = ScratchBlocksConstants.OUTPUT_SHAPE_ROUND; 
             break;
         case BlockType.BOOLEAN:
             blockJSON.output = 'Boolean';
@@ -1486,6 +1505,18 @@ class Runtime extends EventEmitter {
             }
         }
 
+        if (argInfo.type == ArgumentType.SINGLE_BLOCK) {
+            argJSON = {
+
+                type: 'input_statement_single',
+                name: placeholder
+            }
+        } else if (argInfo.type == ArgumentType.INLINE_STACK) {
+            argJSON = {
+                type: 'inline_statement',
+                name: placeholder
+            }
+        }
         const argsName = `args${context.outLineNum}`;
         const blockArgs = (context.blockJSON[argsName] = context.blockJSON[argsName] || []);
         if (argJSON) blockArgs.push(argJSON);
@@ -1690,6 +1721,15 @@ class Runtime extends EventEmitter {
      */
     getOpcodeFunction (opcode) {
         return this._primitives[opcode];
+    }
+
+    /**
+     * Retrieve the arguments declared by an extension block.
+     * @param {!string} opcode The opcode to look up.
+     * @returns {Object.<string, object>} Argument metadata by argument name.
+     */
+    getBlockArguments (opcode) {
+        return this._blockArguments[opcode] || {};
     }
 
     /**
