@@ -181,6 +181,12 @@ class Thread {
         this.blockContainer = null;
 
         /**
+         * Whether the thread runs a compiled script instead of stepping blocks.
+         * @type {boolean}
+         */
+        this.isCompiled = false;
+
+        /**
          * Whether the thread requests its script to glow during this frame.
          * @type {boolean}
          */

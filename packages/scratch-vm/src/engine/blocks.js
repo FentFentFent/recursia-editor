@@ -581,6 +581,9 @@ class Blocks {
         this._cache._executeCached = {};
         this._cache._monitored = null;
         this._cache.scripts = {};
+        if (this.runtime.compiler) {
+            this.runtime.compiler.invalidateCache(this);
+        }
     }
 
     /**

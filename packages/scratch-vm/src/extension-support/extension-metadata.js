@@ -6,6 +6,7 @@
  * @property {string} [blockIconURI] - URI for an image to be placed on each block in this extension. Data URI ok.
  * @property {string} [menuIconURI] - URI for an image to be placed on this extension's category menu item. Data URI ok.
  * @property {string} [docsURI] - link to documentation content for this extension.
+ * @property {ColorStyle} [colorStyle] - colors for this extension's category and blocks in each color mode.
  * @property {Array.<ExtensionBlockMetadata|string>} blocks - the blocks provided by this extension, plus separators.
  * @property {Object.<ExtensionMenuMetadata>} [menus] - map of menu name to metadata for each of this extension's menus.
  */
@@ -29,6 +30,41 @@
  * @property {int} [branchCount] - for flow control blocks, the number of branches/substacks for this block.
  * @property {Object.<ExtensionArgumentMetadata>} [arguments] - map of argument placeholder to metadata about each arg.
  * @property {StyleType|Array.<StyleType>} [style] - Visual styles applied to the block, if any.
+ * @property {ColorStyle} [colorStyle] - overrides the extension's color style for this block, if any.
+ * @property {ExtensionCompileFunction} [compile] - compiles this block to JavaScript instead of running it through
+ * the interpreter. Only unsandboxed extensions can provide it: a function cannot cross the worker boundary.
+ */
+
+/**
+ * @typedef {Function} ExtensionCompileFunction
+ * Compiles one block of an unsandboxed extension to JavaScript.
+ * @param {CompileBlockContext} context - the block being compiled, and the helpers that read its inputs, branches and
+ * fields. See `src/compiler/compile-block-context.js`.
+ * @returns {string|{lines: Array.<string>, source: string}} For a command, the source lines that run the block. For a
+ * reporter or boolean, the expression that holds its value, or an object of lines that run first and that expression.
+ */
+
+/**
+ * @typedef {object} ColorStyleColors
+ * The block colors for a single color mode.
+ * @property {string} color1 - the primary color, used for the block's fill, in '#rrggbb' format
+ * @property {string} [color2] - the secondary color, used for the block's outline; defaults to color1
+ * @property {string} [color3] - the tertiary color, used for fields and inputs; defaults to color2 or color1
+ */
+
+/**
+ * @typedef {object} ColorStyle
+ * The colors used by an extension's category and blocks, per color mode. Each color mode key may hold either
+ * the colors for that mode or the name of a built-in block color style (see ColorStyle in color-style.js) to
+ * extend for that mode. Color modes without their own entry use `base`; without a `base` the extension's
+ * color1, color2 and color3 are used in the default color mode and the built-in extension colors are used in
+ * the other color modes.
+ * @property {string|ColorStyleColors} [base] - the color style for color modes without their own entry
+ * @property {string|ColorStyleColors} [default] - the color style for the default ("original") color mode
+ * @property {string|ColorStyleColors} [dark] - the color style for the dark color mode
+ * @property {string|ColorStyleColors} [high-contrast] - the color style for the high contrast color mode
+ * @property {string|ColorStyleColors} [cherry-light] - the color style for the cherry light color mode
+ * @property {string|ColorStyleColors} [cherry-dark] - the color style for the cherry dark color mode
  */
 
 /**

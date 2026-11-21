@@ -39,7 +39,11 @@ class Scratch3CoreExample {
                     opcode: 'exampleOpcode',
                     blockType: BlockType.REPORTER,
                     text: 'example block',
-                    style: StyleShape.ExtraPadded
+                    style: StyleShape.ExtraPadded,
+                    compile: context =>
+                        `(runtime.getTargetForStage() ? runtime.getTargetForStage().getName() : ${
+                            context.quote('no stage yet')
+                        })`
                 },
                 {
                     blockType: BlockType.XML,

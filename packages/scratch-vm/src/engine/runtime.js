@@ -4,6 +4,7 @@ const uuid = require('uuid');
 
 const ArgumentType = require('../extension-support/argument-type');
 const Blocks = require('./blocks');
+const Compiler = require('../compiler/compiler');
 const BlocksRuntimeCache = require('./blocks-runtime-cache');
 const BlockType = require('../extension-support/block-type');
 const Profiler = require('./profiler');
@@ -222,6 +223,12 @@ class Runtime extends EventEmitter {
         this.sequencer = new Sequencer(this);
 
         /**
+         * Compiler that upgrades threads to compiled scripts.
+         * @type {!Compiler}
+         */
+        this.compiler = new Compiler(this);
+
+        /**
          * Storage container for flyout blocks.
          * These will execute on `_editingTarget.`
          * @type {!Blocks}
@@ -268,6 +275,20 @@ class Runtime extends EventEmitter {
          * @type {Object.<string, Object>}
          */
         this._blockArguments = {};
+
+        /**
+         * Opcodes of the block packages built in to the runtime, as opposed to
+         * blocks that an extension added.
+         * @type {Set.<string>}
+         */
+        this._coreOpcodes = new Set();
+
+        /**
+         * Map to look up the function an extension registered to compile one of
+         * its blocks, by extended opcode.
+         * @type {Object.<string, Function>}
+         */
+        this._compileFunctions = {};
 
         /**
          * A list of script block IDs that were glowing during the previous frame.
@@ -824,6 +845,7 @@ class Runtime extends EventEmitter {
                         if (Object.prototype.hasOwnProperty.call(packagePrimitives, op)) {
                             this._primitives[op] =
                                 packagePrimitives[op].bind(packageObject);
+                            this._coreOpcodes.add(op);
                         }
                     }
                 }
@@ -938,6 +960,16 @@ class Runtime extends EventEmitter {
      * @private
      */
     _fillExtensionCategory (categoryInfo, extensionInfo) {
+        // A new extension can implement opcodes compiled scripts already ran.
+        this.compiler.invalidateAll();
+
+        // Drop the compile functions this extension registered last time: a
+        // block can lose its compilation function when the extension reloads.
+        for (const opcode of categoryInfo.compileOpcodes || []) {
+            delete this._compileFunctions[opcode];
+        }
+        categoryInfo.compileOpcodes = [];
+
         categoryInfo.blocks = [];
         categoryInfo.customFieldTypes = {};
         categoryInfo.menus = [];
@@ -975,6 +1007,10 @@ class Runtime extends EventEmitter {
                         this._primitives[opcode] = convertedBlock.info.func;
                     }
                     this._blockArguments[opcode] = convertedBlock.info.arguments || {};
+                    if (typeof blockInfo.compile === 'function') {
+                        this._compileFunctions[opcode] = blockInfo.compile;
+                        categoryInfo.compileOpcodes.push(opcode);
+                    }
                     if (blockInfo.blockType === BlockType.EVENT || blockInfo.blockType === BlockType.HAT) {
                         this._hats[opcode] = {
                             edgeActivated: blockInfo.isEdgeActivated,
@@ -1724,12 +1760,32 @@ class Runtime extends EventEmitter {
     }
 
     /**
+     * Return whether an opcode belongs to a block built in to the runtime, as
+     * opposed to a block added by an extension.
+     * @param {!string} opcode The opcode to look up.
+     * @returns {boolean} True if the block is a core block.
+     */
+    isCoreOpcode (opcode) {
+        return this._coreOpcodes.has(opcode);
+    }
+
+    /**
      * Retrieve the arguments declared by an extension block.
      * @param {!string} opcode The opcode to look up.
      * @returns {Object.<string, object>} Argument metadata by argument name.
      */
     getBlockArguments (opcode) {
         return this._blockArguments[opcode] || {};
+    }
+
+    /**
+     * Get the function an extension registered to compile one of its blocks.
+     * @param {string} opcode Extended opcode of the block.
+     * @returns {?Function} The compilation function, or null when the block is
+     *     compiled the usual way instead.
+     */
+    getCompileFunction (opcode) {
+        return this._compileFunctions[opcode] || null;
     }
 
     /**
@@ -1850,8 +1906,10 @@ class Runtime extends EventEmitter {
         if (topBlock && topBlock.opcode === 'procedures_definition') {
             thread.startFunctionScope();
         }
-        this.threads.push(thread);
-        return thread;
+        // Attempt to run the script compiled, falling back to interpretation.
+        const compiledThread = this.compiler.compileThread(thread) || thread;
+        this.threads.push(compiledThread);
+        return compiledThread;
     }
 
     /**
@@ -1879,10 +1937,11 @@ class Runtime extends EventEmitter {
         newThread.updateMonitor = thread.updateMonitor;
         newThread.blockContainer = thread.blockContainer;
         newThread.pushStack(thread.topBlock);
+        const compiledThread = this.compiler.compileThread(newThread) || newThread;
         const i = this.threads.indexOf(thread);
         if (i > -1) {
-            this.threads[i] = newThread;
-            return newThread;
+            this.threads[i] = compiledThread;
+            return compiledThread;
         }
         this.threads.push(thread);
         return thread;

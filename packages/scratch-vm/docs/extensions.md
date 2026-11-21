@@ -303,6 +303,85 @@ menus: {
 }
 ```
 
+## Compiling Blocks to JavaScript
+
+A block that has a function runs through the interpreter, one block per pass. An unsandboxed extension can also
+give a block a `compile` function, which describes how the block becomes JavaScript. The compiler puts that code
+in the generator that runs the script, so the block runs directly, with the same input values the interpreter
+would give it.
+
+```js
+class SomeBlocks {
+    getInfo () {
+        return {
+            id: 'someBlocks',
+            blocks: [{
+                opcode: 'moveBy',
+                blockType: BlockType.COMMAND,
+                text: 'move [DISTANCE]',
+                arguments: {
+                    DISTANCE: {type: ArgumentType.NUMBER, defaultValue: 10}
+                },
+                func: 'moveBy',
+                compile: context =>
+                    `target.setXY(target.x + Cast.toNumber(${context.argument('DISTANCE')}), target.y);`
+            }, {
+                opcode: 'isEven',
+                blockType: BlockType.BOOLEAN,
+                text: 'is [NUMBER] even?',
+                arguments: {
+                    NUMBER: {type: ArgumentType.NUMBER, defaultValue: 2}
+                },
+                func: 'isEven',
+                compile: context => `(Cast.toNumber(${context.argument('NUMBER')}) % 2 === 0)`
+            }]
+        };
+    }
+
+    moveBy (args) {
+        // ...
+    }
+
+    isEven (args) {
+        // ...
+    }
+}
+```
+
+`compile` receives a context for the block being compiled:
+
+| Member | Returns |
+| ------ | ------- |
+| `context.argument(name)` | JavaScript expression for the value of an input, including blocks plugged into it |
+| `context.field(name)` | JavaScript expression for the value of a field, such as a dropdown selection |
+| `context.substack(name)` | Source lines that run the blocks in a branch, for a block with a substack |
+| `context.local(hint)` | A new identifier no other generated code uses |
+| `context.helper(key, hint, source)` | Declares a helper once at the top of the script and returns its name |
+| `context.indent(lines, levels)` | The lines, indented by that many tabs |
+| `context.loopYield()` | The lines that end a loop iteration, for a block that loops over its substack |
+| `context.yieldTurn()` / `context.yieldFrame()` | A statement that gives the other threads their turn / ends the frame |
+| `context.quote(value)` | JavaScript literal source for a value |
+| `context.error(message, {hint})` | A compiler error to throw |
+| `context.valueUsed` | `true` when the block's value is used instead of the block running |
+| `context.emitter` | The script emitter, for code that needs more than these helpers |
+
+An input's value is an expression of whatever type the input block reports, and a typed input block such as a
+number or text literal reports text, so cast it the way the interpreter would: `Cast.toNumber(...)`,
+`Cast.toString(...)` or `Cast.toBoolean(...)`.
+
+A command returns the source lines that run it, either as a string or as `{lines}`. A reporter or boolean returns
+the expression that holds its value, either as a string or as `{lines, source}`, where the lines run first. The
+compiled code runs inside a generator, with `runtime`, `target`, `thread`, `util`, `sequencer`, `Cast`, `MathUtil`,
+`Timer` and `Signals` in scope, and `__warp` is true when the script is running without screen refresh. It can
+therefore `yield Signals.YIELD`, `yield Signals.TICK` or `yield Signals.promise(promise)`.
+
+Compilation is optional per block: a block without `compile` keeps running through its `func`, exactly as before.
+If a compilation function throws or returns nothing usable, the whole script runs interpreted instead, so the
+project still works. A block still needs its `func`: the interpreter runs it in projects that are not compiled,
+and when compilation is not possible.
+
+Because a function cannot cross a worker boundary, `compile` is only available to unsandboxed extensions.
+
 ## Annotated Example
 
 ```js

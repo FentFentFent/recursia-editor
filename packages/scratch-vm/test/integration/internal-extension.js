@@ -134,3 +134,72 @@ test('load sync', t => {
 
     t.end();
 });
+
+test('coreExample compiles its example opcode', t => {
+    const vm = new VirtualMachine();
+    vm.extensionManager.loadExtensionIdSync('coreExample');
+
+    const sprite = new Sprite(null, vm.runtime);
+    sprite.name = 'Stage';
+    const stage = new RenderedTarget(sprite, vm.runtime);
+    stage.isStage = true;
+    vm.runtime.targets = [stage];
+    stage.createVariable('variableId', 'x', '');
+
+    t.type(
+        vm.runtime.getCompileFunction('coreExample_exampleOpcode'),
+        'function',
+        'the block registers a compilation function'
+    );
+
+    for (const block of [
+        {
+            id: 'hat',
+            opcode: 'event_whenflagclicked',
+            next: 'set',
+            parent: null,
+            topLevel: true,
+            inputs: {},
+            fields: {},
+            shadow: false
+        },
+        {
+            id: 'set',
+            opcode: 'data_setvariableto',
+            next: null,
+            parent: 'hat',
+            topLevel: false,
+            inputs: {VALUE: {name: 'VALUE', block: 'name', shadow: 'name'}},
+            fields: {VARIABLE: {name: 'VARIABLE', id: 'variableId', value: 'x'}},
+            shadow: false
+        },
+        {
+            id: 'name',
+            opcode: 'coreExample_exampleOpcode',
+            next: null,
+            parent: 'set',
+            topLevel: false,
+            inputs: {},
+            fields: {},
+            shadow: false
+        }
+    ]) {
+        stage.blocks.createBlock(block);
+    }
+
+    const thread = vm.runtime._pushThread('hat', stage);
+
+    t.ok(thread.isCompiled, 'the script runs compiled');
+    t.match(
+        vm.runtime.compiler.getFinishedWork(),
+        /runtime\.getTargetForStage\(\)/,
+        'the block compiles to its own code'
+    );
+
+    vm.runtime.currentStepTime = Infinity;
+    vm.runtime.sequencer.stepThreads();
+
+    t.equal(stage.lookupVariableById('variableId').value, 'Stage', 'the compiled block ran');
+
+    t.end();
+});

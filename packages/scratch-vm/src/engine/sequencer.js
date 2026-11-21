@@ -207,6 +207,17 @@ class Sequencer {
      * @param {!Thread} thread Thread object to step.
      */
     stepThread (thread) {
+        if (thread.isCompiled) {
+            // Compiled threads resume their compiled script instead of stepping
+            // blocks. They retire themselves when their script ends.
+            if (thread.target === null) {
+                this.retireThread(thread);
+            } else {
+                thread.step(this);
+            }
+            return;
+        }
+
         let currentBlockId = thread.peekStack();
         if (!currentBlockId) {
             // A "null block" - empty branch.
