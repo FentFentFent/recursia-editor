@@ -66,11 +66,11 @@ class CompileBlockContext {
 		this.valueUsed = valueUsed;
 
 		/**
-		 * Lines the helpers asked to run before the block. The compiler emits
-		 * them before the code the compilation function returns.
-		 * @type {Array.<string>}
+		 * Statements the helpers asked to run before the block. The compiler
+		 * emits them before the code the compilation function returns.
+		 * @type {Array.<object>}
 		 */
-		this.lines = [];
+		this.statements = [];
 	}
 
 	/**
@@ -85,9 +85,9 @@ class CompileBlockContext {
 	argument (name) {
 		const input = this.emitter.input(this.block, name);
 
-		this.lines.push(...input.lines);
+		this.statements.push(...input.statements);
 
-		return input.source;
+		return this.emitter.render(input.source);
 	}
 
 	/**
@@ -107,7 +107,7 @@ class CompileBlockContext {
 	substack (name = 'SUBSTACK') {
 		const firstId = this.emitter.branch(this.block, name);
 
-		return firstId ? this.emitter.stack(firstId).lines : [];
+		return firstId ? this.emitter.renderStatements(this.emitter.stack(firstId)) : [];
 	}
 
 	/**
@@ -147,7 +147,7 @@ class CompileBlockContext {
 	 * @returns {Array.<string>} Source lines.
 	 */
 	loopYield () {
-		return this.emitter.loopYield();
+		return this.emitter.renderStatements(this.emitter.loopYield());
 	}
 
 	/**

@@ -413,6 +413,7 @@ class Scratch3Text2SpeechBlocks {
 
         return {
             id: 'text2speech',
+            colorStyle: 'text2speech',
             name: formatMessage({
                 id: 'text2speech.categoryName',
                 default: 'Text to Speech',

@@ -3,7 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import * as Blockly from 'blockly/core'
+import { importBlocksWithCulling, resetBlockCulling, scheduleBlockCulling, updateBlockCulling } from './block_culling'
+import { CollapsibleStatementInput } from './inputs/statement_input'
 import { ScratchVariableModel } from './scratch_variable_model'
+
+/** XML attribute listing the statement inputs of a block that are collapsed. */
+const COLLAPSED_INPUTS_ATTRIBUTE = 'collapsedinputs'
 
 // Blockly's blockToDom has a bug where the `empty` flag for an input's
 // container element is only set to false when a non-shadow target block
@@ -81,8 +86,20 @@ Blockly.Xml.blockToDom = function blockToDomFixed(
  * @returns An array of variable IDs created during loading.
  */
 export function clearWorkspaceAndLoadFromXml(xml: Element, workspace: Blockly.WorkspaceSvg): string[] {
+  // Collect the collapsed statement inputs before loading: Blockly ignores the
+  // attribute, so the inputs have to be folded after their blocks exist.
+  const collapsedInputs = new Map<string, string[]>()
+  for (const element of xml.querySelectorAll(
+    `block[${COLLAPSED_INPUTS_ATTRIBUTE}], shadow[${COLLAPSED_INPUTS_ATTRIBUTE}]`,
+  )) {
+    const id = element.getAttribute('id')
+    const names = element.getAttribute(COLLAPSED_INPUTS_ATTRIBUTE)?.split(',').filter(Boolean)
+    if (id && names?.length) collapsedInputs.set(id, names)
+  }
+
   workspace.setResizesEnabled(false)
   Blockly.Events.setGroup(true)
+  resetBlockCulling(workspace)
   workspace.clear()
 
   // Manually load variables to include the cloud and local properties that core
@@ -107,7 +124,7 @@ export function clearWorkspaceAndLoadFromXml(xml: Element, workspace: Blockly.Wo
   // Defer to core for the rest of the deserialization.
   let blockIds: string[]
   try {
-    blockIds = Blockly.Xml.domToWorkspace(xml, workspace)
+    blockIds = importBlocksWithCulling(xml, workspace)
   } catch (error) {
     const context =
       Array.from(xml.children)
@@ -128,6 +145,22 @@ export function clearWorkspaceAndLoadFromXml(xml: Element, workspace: Blockly.Wo
     Blockly.Events.setGroup(false)
     workspace.setResizesEnabled(true)
   }
+
+  for (const [blockId, names] of collapsedInputs) {
+    const block = workspace.getBlockById(blockId)
+    if (!block) continue
+    for (const name of names) {
+      const input = block.getInput(name)
+      if (input instanceof CollapsibleStatementInput) {
+        input.setCollapsed(true, false)
+      }
+    }
+  }
+
+  // Draw the stacks at the current viewport now, and again after the caller has
+  // restored its scroll position.
+  updateBlockCulling(workspace)
+  scheduleBlockCulling(workspace)
 
   return blockIds
 }

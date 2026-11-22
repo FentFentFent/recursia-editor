@@ -37,6 +37,15 @@ class BlockUtility {
     }
 
     /**
+     * ID of the block being run, or an empty string when there is none. This is how a meta block
+     * finds its own branch: the blocks inside it are read from this block's `SUBSTACK` input.
+     * @type {string}
+     */
+    get blockId () {
+        return this.thread ? this.thread.peekStack() || '' : '';
+    }
+
+    /**
      * The runtime the block primitive is running in.
      * @type {Runtime}
      */

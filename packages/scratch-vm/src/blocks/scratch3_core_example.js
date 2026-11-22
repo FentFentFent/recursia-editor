@@ -139,6 +139,43 @@ class Scratch3CoreExample {
                     blockType: BlockType.HAT,
                     text: 'bowler hat',
                     style: StyleShape.BowlerHat
+                },
+                {
+                    blockType: BlockType.LABEL,
+                    text: 'Color styles'
+                },
+                {
+                    opcode: 'extendedColorStyle',
+                    func: 'exampleColorStyleBlock',
+                    blockType: BlockType.COMMAND,
+                    text: 'motion colors',
+                    colorStyle: {
+                        base: 'motion'
+                    }
+                },
+                {
+                    opcode: 'customColorStyle',
+                    func: 'exampleColorStyleBlock',
+                    blockType: BlockType.COMMAND,
+                    text: 'own colors in every color mode',
+                    colorStyle: {
+                        default: {color1: '#FF8C1A', color2: '#DB6E00', color3: '#FFE5CC'},
+                        dark: {color1: '#331C05', color2: '#EE7A3C', color3: '#FFE5CC'},
+                        'high-contrast': {color1: '#FFA54C', color2: '#FFE5CC', color3: '#DB6E00'},
+                        'cherry-light': {color1: '#EE7A3C', color2: '#C2541C', color3: '#AF3B18'},
+                        'cherry-dark': {color1: '#331B0F', color2: '#EE7A3C', color3: '#E05A32'}
+                    }
+                },
+                {
+                    opcode: 'mixedColorStyle',
+                    func: 'exampleColorStyleBlock',
+                    blockType: BlockType.COMMAND,
+                    text: 'pen colors, overridden per color mode',
+                    colorStyle: {
+                        base: 'pen',
+                        dark: 'sensing',
+                        'cherry-dark': {color1: '#33121B', color2: '#E8456B'}
+                    }
                 }
             ]
         };
@@ -172,6 +209,13 @@ class Scratch3CoreExample {
      * Shared no-op implementation for the blocks that demonstrate block styles.
      */
     exampleStyleBlock () {
+        return;
+    }
+
+    /**
+     * Shared no-op implementation for the blocks that demonstrate block color styles.
+     */
+    exampleColorStyleBlock () {
         return;
     }
 

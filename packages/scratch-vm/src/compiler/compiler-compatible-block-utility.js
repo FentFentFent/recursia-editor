@@ -50,6 +50,25 @@ class CompilerCompatibleBlockUtility extends BlockUtility {
 		 * @type {*}
 		 */
 		this.returnValue = '';
+
+		/**
+		 * Procedure the primitive asked to start, with the parameters it was given.
+		 * @type {?{procedureCode: string, params: object}}
+		 */
+		this.startedProcedure = null;
+
+		/**
+		 * Procedure the primitive asked to run for its value, with the parameters it was given.
+		 * @type {?{procedureCode: string, params: object}}
+		 */
+		this.startedReturningProcedure = null;
+
+		/**
+		 * Value the procedure the primitive started for its value returned, or null when it has not
+		 * returned yet.
+		 * @type {*}
+		 */
+		this.returnedProcedureValue = null;
 	}
 
 	/**
@@ -84,6 +103,9 @@ class CompilerCompatibleBlockUtility extends BlockUtility {
 		this.stopped = false;
 		this.returned = false;
 		this.returnValue = '';
+		this.startedProcedure = null;
+		this.startedReturningProcedure = null;
+		this.returnedProcedureValue = null;
 		this.thread.pushStack(blockId);
 	}
 
@@ -138,6 +160,72 @@ class CompilerCompatibleBlockUtility extends BlockUtility {
 			blockId: (blockInput && blockInput.blockId) || null,
 			isLoop: false
 		};
+	}
+
+	/**
+	 * Start a procedure on the thread running the compiled script.
+	 *
+	 * A compiled script has no block stack for the sequencer to step into, so the
+	 * procedure is recorded with the parameters the primitive pushed, and the
+	 * compiled script runs the compiled procedure where it called the primitive.
+	 * @param {string} procedureCode Procedure code of the procedure to start.
+	 */
+	startProcedure (procedureCode) {
+		this.startedProcedure = {
+			procedureCode,
+			params: Object.assign({}, this.thread.peekStackFrame().params)
+		};
+	}
+
+	/**
+	 * Take the procedure the primitive asked to start.
+	 * @returns {?{procedureCode: string, params: object}} The procedure, or null.
+	 */
+	takeStartedProcedure () {
+		const started = this.startedProcedure;
+		this.startedProcedure = null;
+		return started;
+	}
+
+	/**
+	 * Start a procedure whose value the primitive reports.
+	 *
+	 * The first call records the procedure for the compiled script to run, and the block is run
+	 * again once the procedure returns so that this call hands it the value.
+	 * @param {string} procedureCode Procedure code of the procedure to start.
+	 * @returns {*} The value the procedure returned, or an empty value until it has run.
+	 */
+	startProcedureReturning (procedureCode) {
+		if (this.returnedProcedureValue !== null) {
+			const value = this.returnedProcedureValue;
+			this.returnedProcedureValue = null;
+			return value;
+		}
+
+		this.startedReturningProcedure = {
+			procedureCode,
+			params: Object.assign({}, this.thread.peekStackFrame().params)
+		};
+
+		return '';
+	}
+
+	/**
+	 * Take the procedure the primitive asked to run for its value.
+	 * @returns {?{procedureCode: string, params: object}} The procedure, or null.
+	 */
+	takeStartedReturningProcedure () {
+		const started = this.startedReturningProcedure;
+		this.startedReturningProcedure = null;
+		return started;
+	}
+
+	/**
+	 * Keep the value a procedure returned, for the block which started it to report.
+	 * @param {*} value Value the procedure returned.
+	 */
+	setReturnedProcedureValue (value) {
+		this.returnedProcedureValue = value;
 	}
 
 	/**

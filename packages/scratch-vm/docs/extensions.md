@@ -303,6 +303,80 @@ menus: {
 }
 ```
 
+## Meta Blocks
+
+Most blocks do something when a script reaches them. A meta block instead describes metadata about the
+project as a whole, and the VM reads it instead of running it as part of a script. Declare one with
+`BlockType.META`:
+
+```js
+{
+    opcode: 'defineClass',
+    blockType: BlockType.META,
+    text: 'define class [NAME] extends [PARENTS]',
+    arguments: {
+        NAME: {type: ArgumentType.STRING, defaultValue: 'Thing'},
+        PARENTS: {type: ArgumentType.STRING, defaultValue: ''}
+    }
+}
+```
+
+A meta block has no previous or next connection: it sits on the workspace on its own and cannot be
+joined to a stack. It appears in the palette with the extension's other blocks, so a project declares
+its metadata by dragging meta blocks onto the workspace.
+
+A meta block's implementation takes the same `(args, util)` as any other block, but because it runs
+outside a script only the literal values filling its inputs are passed: a reporter dropped into a meta
+block's input is not evaluated, while fields always provide their values.
+
+A meta block may also have branches, declared with `branchCount` like a conditional block. The blocks
+inside a branch are not run by the VM, so they only mean something to the extension which declared them:
+a class block, for example, holds `field`, `method` and `constructor` blocks which describe the class. To
+read its branch, a meta block's implementation uses its own block id from `util.blockId` and walks the
+`SUBSTACK` input of that block.
+
+The runtime runs every meta block in the project when the project starts, before any script runs, so
+the metadata they describe exists for the whole run. `runtime.getMetaBlocks()` lists them and
+`runtime.runMetaBlocks()` runs them again, which an extension can use to rebuild its metadata after a
+meta block changes. The Collections extension uses meta blocks to create every class a project declares.
+
+## Mutators
+
+Some blocks should have a different number of inputs in every project: a call block, for example, needs one
+input per argument of whatever it calls. Set `mutator: true` on such a block and let the project add the
+rest of its inputs:
+
+```js
+{
+    opcode: 'callMethod',
+    blockType: BlockType.COMMAND,
+    text: 'call method [METHOD] of instance [INSTANCE]',
+    mutator: true,
+    arguments: {
+        METHOD: {type: ArgumentType.STRING},
+        INSTANCE: {type: ArgumentType.STRING}
+    }
+}
+```
+
+A mutator block starts with the arguments in its block info. Its right-click menu gains **add argument**,
+which appends an input named `ARG1`, then `ARG2`, and so on, and **remove argument**, which takes the last
+one away. Those inputs are ordinary string inputs, presented after the text's own arguments, so they are
+where the user drops the values to send:
+
+```js
+callMethod (args, util) {
+    // The values of ARG1, ARG2... in the order the inputs appear on the block.
+    const values = this._argumentValuesFromBlock(args, util);
+    ...
+}
+```
+
+The arguments a mutator adds live in the block's mutation rather than in its block info, so a saved project
+keeps them. The block is therefore `isDynamic`: the GUI builds it from the `blockInfo` in its mutation, and
+changes made to that mutation reach the VM as block change events like any other mutation. The Collections
+extension's `call method ... of instance ...` block uses a mutator for the arguments of the method it calls.
+
 ## Compiling Blocks to JavaScript
 
 A block that has a function runs through the interpreter, one block per pass. An unsandboxed extension can also
@@ -382,6 +456,14 @@ and when compilation is not possible.
 
 Because a function cannot cross a worker boundary, `compile` is only available to unsandboxed extensions.
 
+A block without `compile` still runs its `func` inside the compiled script, through a block utility which records
+the control operations the function asks for and lets the script perform them where the sequencer would. The
+operations therefore work the same compiled as interpreted: starting a branch or a block input, stopping the
+script, returning from a procedure, yielding, and starting a procedure with `util.startProcedure`. A procedure a
+primitive starts, such as a class constructor, runs to completion before the block's script continues. Since the
+primitive names the procedure at runtime, a script that calls an extension block is compiled with every procedure
+on its target. The function also receives the block's mutation in `args.mutation`, as it does when interpreted.
+
 ## Annotated Example
 
 ```js
@@ -418,6 +500,17 @@ class SomeBlocks {
             // Core extensions only: override the default extension block colors.
             color1: '#FF8C1A',
             color2: '#DB6E00',
+
+            // Optional: colors for this extension's category and blocks in each color mode.
+            // Each color-mode key holds either the colors for that mode or the name of a built-in
+            // block color style ('motion', 'looks', 'pen', etc.) to extend for that mode. `base`
+            // is used for any color mode without its own entry.
+            // A colorStyle may also be a string naming an entry in
+            // src/extension-support/color_styles.js, e.g. `colorStyle: 'pen'`.
+            colorStyle: {
+                base: 'pen',
+                dark: {color1: '#0B2620', color2: '#2FA98D', color3: '#A3F5DE'}
+            },
 
             // Optional: the human-readable name of this extension as string.
             // This and any other string to be displayed in the Scratch UI may either be
@@ -475,6 +568,9 @@ class SomeBlocks {
                     //     A LOOP block is like a CONDITIONAL block with two differences:
                     //     - the block is assumed to have exactly one child branch, and
                     //     - each time a child branch finishes, the loop block is called again.
+                    //   BlockType.META - a top-level block with no previous or next connection which
+                    //     describes project metadata, like a class definition, instead of a step a script
+                    //     runs. The runtime runs every meta block in the project when the project starts.
                     blockType: BlockType.REPORTER,
 
                     // Required for CONDITIONAL blocks, ignored for others: the number of
@@ -487,6 +583,11 @@ class SomeBlocks {
                     // Optional, default false: whether or not this block ends a stack.
                     // The "forever" and "stop all" blocks would specify true here.
                     terminal: true,
+
+                    // Optional, default false: whether the project adds some of this block's inputs.
+                    // A mutator block's right-click menu can add arguments named ARG1, ARG2... after
+                    // the block's own arguments. Its implementation reads their values from `args`.
+                    mutator: false,
 
                     // Optional, default false: whether or not to block all threads while
                     // this block is busy. This is for things like the "touching color"
@@ -538,6 +639,12 @@ class SomeBlocks {
                     // Optional: the function implementing this block.
                     // If absent, assume `func` is the same as `opcode`.
                     func: 'myReporter',
+
+                    // Optional: colors for this block only, overriding the extension's colorStyle.
+                    // Takes the same form as the extension-level colorStyle.
+                    colorStyle: {
+                        default: {color1: '#FF8C1A', color2: '#DB6E00'}
+                    },
 
                     // Optional: list of target types for which this block should appear.
                     // If absent, assume it applies to all builtin targets -- that is:

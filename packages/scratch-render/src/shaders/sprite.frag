@@ -39,6 +39,12 @@ uniform float u_lineThickness;
 uniform float u_lineLength;
 #endif // DRAW_MODE_line
 
+#ifdef DRAW_MODE_lineBatch
+varying vec4 v_lineColor;
+varying float v_lineLength;
+varying float v_lineThickness;
+#endif // DRAW_MODE_lineBatch
+
 #ifdef DRAW_MODE_background
 uniform vec4 u_backgroundColor;
 #endif // DRAW_MODE_background
@@ -115,7 +121,7 @@ const vec2 kCenter = vec2(0.5, 0.5);
 
 void main()
 {
-	#if !(defined(DRAW_MODE_line) || defined(DRAW_MODE_background))
+	#if !(defined(DRAW_MODE_line) || defined(DRAW_MODE_lineBatch) || defined(DRAW_MODE_background))
 	vec2 texcoord0 = v_texCoord;
 
 	#ifdef ENABLE_mosaic
@@ -221,15 +227,25 @@ void main()
 	gl_FragColor.rgb /= gl_FragColor.a + epsilon;
 	#endif
 
-	#endif // !(defined(DRAW_MODE_line) || defined(DRAW_MODE_background))
+	#endif // !(defined(DRAW_MODE_line) || defined(DRAW_MODE_lineBatch) || defined(DRAW_MODE_background))
 
+	#if defined(DRAW_MODE_line) || defined(DRAW_MODE_lineBatch)
 	#ifdef DRAW_MODE_line
+	vec4 lineColor = u_lineColor;
+	float lineThickness = u_lineThickness;
+	float lineLength = u_lineLength;
+	#else // DRAW_MODE_lineBatch
+	vec4 lineColor = v_lineColor;
+	float lineThickness = v_lineThickness;
+	float lineLength = v_lineLength;
+	#endif
+
 	// Maaaaagic antialiased-line-with-round-caps shader.
 
 	// "along-the-lineness". This increases parallel to the line.
 	// It goes from negative before the start point, to 0.5 through the start to the end, then ramps up again
 	// past the end point.
-	float d = ((v_texCoord.x - clamp(v_texCoord.x, 0.0, u_lineLength)) * 0.5) + 0.5;
+	float d = ((v_texCoord.x - clamp(v_texCoord.x, 0.0, lineLength)) * 0.5) + 0.5;
 
 	// Distance from (0.5, 0.5) to (d, the perpendicular coordinate). When we're in the middle of the line,
 	// d will be 0.5, so the distance will be 0 at points close to the line and will grow at points further from it.
@@ -237,11 +253,11 @@ void main()
 	// See https://www.youtube.com/watch?v=PMltMdi1Wzg for a rough outline of the technique used to round the lines.
 	float line = distance(vec2(0.5), vec2(d, v_texCoord.y)) * 2.0;
 	// Expand out the line by its thickness.
-	line -= ((u_lineThickness - 1.0) * 0.5);
+	line -= ((lineThickness - 1.0) * 0.5);
 	// Because "distance to the center of the line" decreases the closer we get to the line, but we want more opacity
 	// the closer we are to the line, invert it.
-	gl_FragColor = u_lineColor * clamp(1.0 - line, 0.0, 1.0);
-	#endif // DRAW_MODE_line
+	gl_FragColor = lineColor * clamp(1.0 - line, 0.0, 1.0);
+	#endif // DRAW_MODE_line || DRAW_MODE_lineBatch
 
 	#ifdef DRAW_MODE_background
 	gl_FragColor = u_backgroundColor;

@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the list blocks.
  *
@@ -26,21 +28,22 @@ const listContents = emit => emit.helper('data:listContents', 'listContents', `l
  * Emit the index a list block works on.
  * @param {ScriptEmitter} emit Compiler emitting the block.
  * @param {object} block Block owning the INDEX input.
- * @param {string} list Name of the list variable.
  * @param {string} length Source of the list length used to clamp the index.
  * @param {boolean} includeAll Whether the "all" index is accepted.
- * @returns {{lines: Array.<string>, index: string, guard: string}} Index source.
+ * @returns {{statements: Array.<object>, index: string, guard: string}} Index source.
  */
-const listIndex = (emit, block, list, length, includeAll) => {
+const listIndex = (emit, block, length, includeAll) => {
 	const index = emit.input(block, 'INDEX');
 	const value = emit.newVarName('index');
 	const guard = emit.newVarName('invalid');
 
 	return {
-		lines: [
-			...index.lines,
-			`const ${value} = Cast.toListIndex(${index.source}, ${length}, ${includeAll});`,
-			`const ${guard} = ${value} === Cast.LIST_INVALID;`
+		statements: [
+			...index.statements,
+			ir.declaration('const', value, ir.source([
+				'Cast.toListIndex(', index.source, ', ', length, ', ', String(includeAll), ')'
+			])),
+			ir.declaration('const', guard, ir.source([value, ' === Cast.LIST_INVALID']))
 		],
 		index: value,
 		guard
@@ -52,22 +55,24 @@ const listIndex = (emit, block, list, length, includeAll) => {
  * @param {ScriptEmitter} emit Compiler emitting the block.
  * @param {object} block The list block.
  * @param {boolean} includeAll Whether the "all" index is accepted.
- * @param {function(string, string, string): Array.<string>} body Source of the write.
- * @returns {{lines: Array.<string>}} Block source.
+ * @param {function(string, string, object): Array.<object>} body Statements of the write.
+ * @returns {{statements: Array.<object>}} Block source.
  */
 const listWrite = (emit, block, includeAll, body) => {
 	const item = emit.input(block, 'ITEM');
 	const list = emit.newVarName('list');
-	const lines = [...item.lines, '{', `\tconst ${list} = ${emit.variable(block, 'LIST')};`];
-	const lookup = listIndex(emit, block, list, `${list}.value.length`, includeAll);
+	const lookup = listIndex(emit, block, `${list}.value.length`, includeAll);
 
-	lines.push(...lookup.lines.map(line => `\t${line}`));
-	lines.push(`\tif (!${lookup.guard}) {`);
-	lines.push(...body(list, lookup.index, item.source).map(line => `\t\t${line}`));
-	lines.push('\t}');
-	lines.push('}');
-
-	return {lines};
+	return {
+		statements: [
+			...item.statements,
+			ir.block([
+				ir.declaration('const', list, emit.variable(block, 'LIST')),
+				...lookup.statements,
+				ir.ifThen(ir.source(['!', lookup.guard]), body(list, lookup.index, item.source))
+			])
+		]
+	};
 };
 
 module.exports = {
@@ -76,21 +81,23 @@ module.exports = {
 			const list = emit.newVarName('list');
 
 			return {
-				lines: [`const ${list} = ${emit.variable(block, 'LIST')};`],
-				source: `${listContents(emit)}(${list})`
+				statements: [ir.declaration('const', list, emit.variable(block, 'LIST'))],
+				source: ir.source([listContents(emit), '(', list, ')'])
 			};
 		},
 
 		data_itemoflist: (emit, block) => {
 			const list = emit.newVarName('list');
-			const lookup = listIndex(emit, block, list, `${list}.value.length`, false);
+			const lookup = listIndex(emit, block, `${list}.value.length`, false);
 
 			return {
-				lines: [
-					`const ${list} = ${emit.variable(block, 'LIST')};`,
-					...lookup.lines
+				statements: [
+					ir.declaration('const', list, emit.variable(block, 'LIST')),
+					...lookup.statements
 				],
-				source: `(${lookup.guard} ? '' : ${list}.value[${lookup.index} - 1])`
+				source: ir.source([
+					'(', lookup.guard, ' ? ', "''", ' : ', list, '.value[', lookup.index, ' - 1])'
+				])
 			};
 		},
 
@@ -101,16 +108,26 @@ module.exports = {
 			const index = emit.newVarName('index');
 
 			return {
-				lines: [
-					...item.lines,
-					`const ${list} = ${emit.variable(block, 'LIST')};`,
-					`const ${value} = ${item.source};`,
-					`let ${index} = 0;`,
-					`for (let i = 0; i < ${list}.value.length; i++) {`,
-					`\tif (Cast.compare(${list}.value[i], ${value}) === 0) { ${index} = i + 1; break; }`,
-					'}'
+				statements: [
+					...item.statements,
+					ir.declaration('const', list, emit.variable(block, 'LIST')),
+					ir.declaration('const', value, item.source),
+					ir.declaration('let', index, ir.literal(0)),
+					ir.forLoop(
+						'let i = 0',
+						ir.source(['i < ', list, '.value.length']),
+						'i++',
+						[
+							ir.ifThen(
+								ir.source([
+									'Cast.compare(', list, '.value[i], ', value, ') === 0'
+								]),
+								[ir.statement(index, ' = i + 1'), ir.statement('break')]
+							)
+						]
+					)
 				],
-				source: index
+				source: ir.source([index])
 			};
 		},
 
@@ -118,8 +135,8 @@ module.exports = {
 			const list = emit.newVarName('list');
 
 			return {
-				lines: [`const ${list} = ${emit.variable(block, 'LIST')};`],
-				source: `${list}.value.length`
+				statements: [ir.declaration('const', list, emit.variable(block, 'LIST'))],
+				source: ir.source([list, '.value.length'])
 			};
 		},
 
@@ -130,16 +147,24 @@ module.exports = {
 			const found = emit.newVarName('found');
 
 			return {
-				lines: [
-					...item.lines,
-					`const ${list} = ${emit.variable(block, 'LIST')};`,
-					`const ${value} = ${item.source};`,
-					`let ${found} = ${list}.value.indexOf(${value}) >= 0;`,
-					`for (let i = 0; i < ${list}.value.length && !${found}; i++) {`,
-					`\t${found} = Cast.compare(${list}.value[i], ${value}) === 0;`,
-					'}'
+				statements: [
+					...item.statements,
+					ir.declaration('const', list, emit.variable(block, 'LIST')),
+					ir.declaration('const', value, item.source),
+					ir.declaration('let', found, ir.source([list, '.value.indexOf(', value, ') >= 0'])),
+					ir.forLoop(
+						'let i = 0',
+						ir.source(['i < ', list, '.value.length && !', found]),
+						'i++',
+						[
+							ir.assignment(
+								ir.source([found]),
+								ir.source(['Cast.compare(', list, '.value[i], ', value, ') === 0'])
+							)
+						]
+					)
 				],
-				source: found
+				source: ir.source([found])
 			};
 		}
 	},
@@ -149,35 +174,37 @@ module.exports = {
 			const list = emit.newVarName('list');
 
 			return {
-				lines: [
-					...item.lines,
-					'{',
-					`\tconst ${list} = ${emit.variable(block, 'LIST')};`,
-					`\t${list}.value.push(${item.source});`,
-					`\t${list}._monitorUpToDate = false;`,
-					'}'
+				statements: [
+					...item.statements,
+					ir.block([
+						ir.declaration('const', list, emit.variable(block, 'LIST')),
+						ir.statement(list, '.value.push(', item.source, ')'),
+						ir.statement(list, '._monitorUpToDate = false')
+					])
 				]
 			};
 		},
 
 		data_deleteoflist: (emit, block) => listWrite(emit, block, true, (list, index) => [
-			`if (${index} === Cast.LIST_ALL) {`,
-			`\t${list}.value = [];`,
-			'} else {',
-			`\t${list}.value.splice(${index} - 1, 1);`,
-			`\t${list}._monitorUpToDate = false;`,
-			'}'
+			ir.ifThen(
+				ir.source([index, ' === Cast.LIST_ALL']),
+				[ir.assignment(ir.source([list, '.value']), ir.source('[]'))],
+				[
+					ir.statement(list, '.value.splice(', index, ' - 1, 1)'),
+					ir.statement(list, '._monitorUpToDate = false')
+				]
+			)
 		]),
 
 		data_deletealloflist: (emit, block) => {
 			const list = emit.newVarName('list');
 
 			return {
-				lines: [
-					'{',
-					`\tconst ${list} = ${emit.variable(block, 'LIST')};`,
-					`\t${list}.value = [];`,
-					'}'
+				statements: [
+					ir.block([
+						ir.declaration('const', list, emit.variable(block, 'LIST')),
+						ir.assignment(ir.source([list, '.value']), ir.source('[]'))
+					])
 				]
 			};
 		},
@@ -185,39 +212,52 @@ module.exports = {
 		data_insertatlist: (emit, block) => {
 			const item = emit.input(block, 'ITEM');
 			const list = emit.newVarName('list');
-			const lookup = listIndex(emit, block, list, `${list}.value.length + 1`, false);
+			const lookup = listIndex(emit, block, `${list}.value.length + 1`, false);
 
 			return {
-				lines: [
-					...item.lines,
-					'{',
-					`\tconst ${list} = ${emit.variable(block, 'LIST')};`,
-					...lookup.lines.map(line => `\t${line}`),
-					`\tif (!${lookup.guard}) {`,
-					`\t\t${list}.value.splice(${lookup.index} - 1, 0, ${item.source});`,
-					`\t\t${list}._monitorUpToDate = false;`,
-					'\t}',
-					'}'
+				statements: [
+					...item.statements,
+					ir.block([
+						ir.declaration('const', list, emit.variable(block, 'LIST')),
+						...lookup.statements,
+						ir.ifThen(ir.source(['!', lookup.guard]), [
+							ir.statement(
+								list, '.value.splice(', lookup.index, ' - 1, 0, ', item.source, ')'
+							),
+							ir.statement(list, '._monitorUpToDate = false')
+						])
+					])
 				]
 			};
 		},
 
-		data_replaceitemoflist: (emit, block) => listWrite(emit, block, false, (list, index, item) => [
-			`${list}.value[${index} - 1] = ${item};`,
-			`${list}._monitorUpToDate = false;`
-		]),
+		data_replaceitemoflist: (emit, block) => listWrite(
+			emit,
+			block,
+			false,
+			(list, index, item) => [
+				ir.assignment(ir.source([list, '.value[', index, ' - 1]']), item),
+				ir.statement(list, '._monitorUpToDate = false')
+			]
+		),
 
 		data_showlist: (emit, block) => ({
-			lines: [
-				`runtime.monitorBlocks.changeBlock({id: ${JSON.stringify(block.fields.LIST.id)}, ` +
-				"element: 'checkbox', value: true}, runtime);"
+			statements: [
+				ir.statement(
+					'runtime.monitorBlocks.changeBlock({id: ',
+					ir.literal(block.fields.LIST.id),
+					", element: 'checkbox', value: true}, runtime)"
+				)
 			]
 		}),
 
 		data_hidelist: (emit, block) => ({
-			lines: [
-				`runtime.monitorBlocks.changeBlock({id: ${JSON.stringify(block.fields.LIST.id)}, ` +
-				"element: 'checkbox', value: false}, runtime);"
+			statements: [
+				ir.statement(
+					'runtime.monitorBlocks.changeBlock({id: ',
+					ir.literal(block.fields.LIST.id),
+					", element: 'checkbox', value: false}, runtime)"
+				)
 			]
 		})
 	}

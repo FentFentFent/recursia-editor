@@ -284,6 +284,7 @@ class Scratch3PenBlocks {
     getInfo () {
         return {
             id: 'pen',
+            colorStyle: 'pen',
             name: formatMessage({
                 id: 'pen.categoryName',
                 default: 'Pen',

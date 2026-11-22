@@ -586,6 +586,7 @@ class Scratch3MicroBitBlocks {
     getInfo () {
         return {
             id: Scratch3MicroBitBlocks.EXTENSION_ID,
+            colorStyle: 'microbit',
             name: Scratch3MicroBitBlocks.EXTENSION_NAME,
             blockIconURI: blockIconURI,
             showStatusButton: true,

@@ -954,6 +954,7 @@ class Scratch3Ev3Blocks {
     getInfo () {
         return {
             id: Scratch3Ev3Blocks.EXTENSION_ID,
+            colorStyle: 'ev3',
             name: 'LEGO EV3',
             blockIconURI: blockIconURI,
             showStatusButton: true,

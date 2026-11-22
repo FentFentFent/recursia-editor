@@ -23,6 +23,7 @@ import defineDynamicBlock from '../lib/define-dynamic-block';
 import {DEFAULT_MODE, getColorsForMode, colorModeMap} from '../lib/settings/color-mode';
 import {CAT_BLOCKS_THEME} from '../lib/settings/theme';
 import {
+    getColorStyleColors,
     injectExtensionBlockIcons,
     injectExtensionCategoryMode,
     getExtensionColors
@@ -585,36 +586,33 @@ class Blocks extends React.Component {
         // Note that Blockly uses the UK spelling of "colour", so fields that
         // interact directly with Blockly follow that convention, while Scratch
         // code uses the US spelling of "color".
-        let colourPrimary = categoryInfo.color1;
-        let colourSecondary = categoryInfo.color2;
-        let colourTertiary = categoryInfo.color3;
-        let colourQuaternary = categoryInfo.color3;
-        if (this.props.colorMode !== DEFAULT_MODE) {
-            const colors = getExtensionColors(this.props.colorMode);
-            colourPrimary = colors.colourPrimary;
-            colourSecondary = colors.colourSecondary;
-            colourTertiary = colors.colourTertiary;
-            colourQuaternary = colors.colourQuaternary;
+        let categoryColors = getColorStyleColors(categoryInfo.colorStyle, this.props.colorMode);
+        if (!categoryColors) {
+            categoryColors = this.props.colorMode === DEFAULT_MODE ? {
+                colourPrimary: categoryInfo.color1,
+                colourSecondary: categoryInfo.color2,
+                colourTertiary: categoryInfo.color3,
+                colourQuaternary: categoryInfo.color3
+            } : getExtensionColors(this.props.colorMode);
         }
-        this.ScratchBlocks.getMainWorkspace()
-            .getTheme()
-            .setBlockStyle(categoryInfo.id, {
-                colourPrimary,
-                colourSecondary,
-                colourTertiary,
-                colourQuaternary
-            });
-        this.ScratchBlocks.getMainWorkspace()
-            .getTheme()
-            .setBlockStyle(`${categoryInfo.id}_selected`, {
-                colourPrimary: colourQuaternary,
-                colourSecondary: colourQuaternary,
-                colourTertiary: colourQuaternary,
-                colourQuaternary: colourQuaternary
-            });
-        this.ScratchBlocks.getMainWorkspace().setTheme(
-            this.ScratchBlocks.getMainWorkspace().getTheme()
-        );
+
+        const theme = this.ScratchBlocks.getMainWorkspace().getTheme();
+        theme.setBlockStyle(categoryInfo.id, categoryColors);
+        theme.setBlockStyle(`${categoryInfo.id}_selected`, {
+            colourPrimary: categoryColors.colourQuaternary,
+            colourSecondary: categoryColors.colourQuaternary,
+            colourTertiary: categoryColors.colourQuaternary,
+            colourQuaternary: categoryColors.colourQuaternary
+        });
+        // Blocks with their own colorStyle use a block style name assigned by the VM.
+        for (const blockInfo of categoryInfo.blocks) {
+            if (!blockInfo.json || blockInfo.json.style === categoryInfo.id) continue;
+            theme.setBlockStyle(
+                blockInfo.json.style,
+                getColorStyleColors(blockInfo.info.colorStyle, this.props.colorMode) || categoryColors
+            );
+        }
+        this.ScratchBlocks.getMainWorkspace().setTheme(theme);
         // Update the toolbox with new blocks if possible
         const toolboxXML = this.getToolboxXML();
         if (toolboxXML) {

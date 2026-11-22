@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the sensing blocks.
  *
@@ -105,85 +107,122 @@ module.exports = {
 		sensing_touchingobject: (emit, block) => {
 			const menu = emit.input(block, 'TOUCHINGOBJECTMENU');
 
-			return {lines: menu.lines, source: `target.isTouchingObject(${menu.source})`};
+			return {
+				statements: menu.statements,
+				source: ir.source(['target.isTouchingObject(', menu.source, ')'])
+			};
 		},
 
 		sensing_touchingcolor: (emit, block) => {
 			const color = emit.input(block, 'COLOR');
 
-			return {lines: color.lines, source: `target.isTouchingColor(Cast.toRgbColorList(${color.source}))`};
+			return {
+				statements: color.statements,
+				source: ir.source(['target.isTouchingColor(Cast.toRgbColorList(', color.source, '))'])
+			};
 		},
 
 		sensing_coloristouchingcolor: (emit, block) => {
 			const inputs = emit.inputs(block, ['COLOR', 'COLOR2']);
 
 			return {
-				lines: inputs.lines,
-				source: `target.colorIsTouchingColor(
-					Cast.toRgbColorList(${inputs.sources.COLOR2}),
-					Cast.toRgbColorList(${inputs.sources.COLOR})
-				)`.replace(/\n\t*/g, ' ')
+				statements: inputs.statements,
+				source: ir.source([
+					'target.colorIsTouchingColor(Cast.toRgbColorList(', inputs.sources.COLOR2,
+					'), Cast.toRgbColorList(', inputs.sources.COLOR, '))'
+				])
 			};
 		},
 
 		sensing_distanceto: (emit, block) => {
 			const menu = emit.input(block, 'DISTANCETOMENU');
 
-			return {lines: menu.lines, source: `${distanceTo(emit)}(target, ${menu.source})`};
+			return {
+				statements: menu.statements,
+				source: ir.source([distanceTo(emit), '(target, ', menu.source, ')'])
+			};
 		},
 
-		sensing_timer: () => ({lines: [], source: 'runtime.ioDevices.clock.projectTimer()'}),
+		sensing_timer: () => ({
+			statements: [],
+			source: ir.source('runtime.ioDevices.clock.projectTimer()')
+		}),
 
 		sensing_of: (emit, block) => {
 			const object = emit.input(block, 'OBJECT');
 
 			return {
-				lines: object.lines,
-				source: `${attributeOf(emit)}(${object.source}, ${emit.field(block, 'PROPERTY')})`
+				statements: object.statements,
+				source: ir.source([
+					attributeOf(emit), '(', object.source, ', ', emit.field(block, 'PROPERTY'), ')'
+				])
 			};
 		},
 
-		sensing_mousex: () => ({lines: [], source: 'runtime.ioDevices.mouse.getScratchX()'}),
-		sensing_mousey: () => ({lines: [], source: 'runtime.ioDevices.mouse.getScratchY()'}),
-		sensing_mousedown: () => ({lines: [], source: 'runtime.ioDevices.mouse.getIsDown()'}),
+		sensing_mousex: () => ({
+			statements: [],
+			source: ir.source('runtime.ioDevices.mouse.getScratchX()')
+		}),
+		sensing_mousey: () => ({
+			statements: [],
+			source: ir.source('runtime.ioDevices.mouse.getScratchY()')
+		}),
+		sensing_mousedown: () => ({
+			statements: [],
+			source: ir.source('runtime.ioDevices.mouse.getIsDown()')
+		}),
 
 		sensing_keypressed: (emit, block) => {
 			const key = emit.input(block, 'KEY_OPTION');
 
 			return {
-				lines: key.lines,
-				source: `runtime.ioDevices.keyboard.getKeyIsDown(${key.source})`
+				statements: key.statements,
+				source: ir.source(['runtime.ioDevices.keyboard.getKeyIsDown(', key.source, ')'])
 			};
 		},
 
 		sensing_current: (emit, block) => ({
-			lines: [],
-			source: `${currentDate(emit)}(${emit.field(block, 'CURRENTMENU')})`
+			statements: [],
+			source: ir.source([currentDate(emit), '(', emit.field(block, 'CURRENTMENU'), ')'])
 		}),
 
-		sensing_dayssince2000: emit => ({lines: [], source: `${daysSince2000(emit)}()`}),
+		sensing_dayssince2000: emit => ({
+			statements: [],
+			source: ir.source([daysSince2000(emit), '()'])
+		}),
 
 		sensing_online: () => ({
-			lines: [],
-			source: "(typeof window !== 'undefined' && " +
+			statements: [],
+			source: ir.source(
+				"(typeof window !== 'undefined' && " +
 				"typeof window.navigator.onLine === 'boolean' ? window.navigator.onLine : '')"
+			)
 		}),
 
-		sensing_username: () => ({lines: [], source: "runtime.ioDevices.userData.getUsername()"}),
+		sensing_username: () => ({
+			statements: [],
+			source: ir.source('runtime.ioDevices.userData.getUsername()')
+		}),
 
 		sensing_answer: (emit, block) => emit.emitPrimitiveCall(block, true, {branches: false}),
 		sensing_loudness: (emit, block) => emit.emitPrimitiveCall(block, true, {branches: false}),
 		sensing_loud: (emit, block) => emit.emitPrimitiveCall(block, true, {branches: false})
 	},
 	statements: {
-		sensing_resettimer: () => ({lines: ['runtime.ioDevices.clock.resetProjectTimer();']}),
+		sensing_resettimer: () => ({
+			statements: [ir.statement('runtime.ioDevices.clock.resetProjectTimer()')]
+		}),
 
 		sensing_setdragmode: (emit, block) => ({
-			lines: [`target.setDraggable(${emit.field(block, 'DRAG_MODE')} === 'draggable');`]
+			statements: [
+				ir.statement(
+					'target.setDraggable(', emit.field(block, 'DRAG_MODE'), " === 'draggable')"
+				)
+			]
 		}),
 
 		sensing_askandwait: (emit, block) => emit.emitPrimitiveCall(block, false, {branches: false}),
 
-		sensing_userid: () => ({lines: []})
+		sensing_userid: () => ({statements: []})
 	}
 };

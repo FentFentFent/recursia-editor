@@ -15,6 +15,10 @@ const testExtensionInfo = {
     color1: '#111111',
     color2: '#222222',
     color3: '#333333',
+    colorStyle: {
+        base: 'pen',
+        dark: {color1: '#444444', color2: '#555555'}
+    },
     blocks: [
         {
             func: 'MAKE_A_VARIABLE',
@@ -103,6 +107,14 @@ const testExtensionInfo = {
             blockType: BlockType.REPORTER,
             text: 'single style',
             style: StyleType.NoRoundedCorners
+        },
+        {
+            opcode: 'customColor',
+            blockType: BlockType.REPORTER,
+            text: 'custom color',
+            colorStyle: {
+                default: 'motion'
+            }
         }
     ]
 };
@@ -237,6 +249,13 @@ const testSingleStyled = function (t, singleStyled) {
     t.same(singleStyled.json.extensions, ['style_noroundedcorners', 'monitor_block']);
 };
 
+const testCustomColor = function (t, customColor) {
+    t.equal(customColor.json.type, 'test_customColor');
+    // A block with its own colorStyle gets a distinct block style name.
+    t.equal(customColor.json.style, 'test_customColor_style');
+    t.same(customColor.info.colorStyle, {default: 'motion'});
+};
+
 const testCommand = function (t, command) {
     t.equal(command.json.type, 'test_command');
     testCategoryInfo(t, command);
@@ -318,6 +337,8 @@ test('registerExtensionPrimitives', t => {
     const runtime = new Runtime();
 
     runtime.on(Runtime.EXTENSION_ADDED, categoryInfo => {
+        t.same(categoryInfo.colorStyle, testExtensionInfo.colorStyle);
+
         const blocksInfo = categoryInfo.blocks;
         t.equal(blocksInfo.length, testExtensionInfo.blocks.length);
 
@@ -328,7 +349,7 @@ test('registerExtensionPrimitives', t => {
 
         // Note that this also implicitly tests that block order is preserved
         const [button, reporter, inlineImage, separator, command, conditional, loop, label, xmlEntry, styled,
-            singleStyled] = blocksInfo;
+            singleStyled, customColor] = blocksInfo;
 
         testButton(t, button);
         testReporter(t, reporter);
@@ -341,6 +362,7 @@ test('registerExtensionPrimitives', t => {
         testXML(t, xmlEntry);
         testStyled(t, styled);
         testSingleStyled(t, singleStyled);
+        testCustomColor(t, customColor);
 
         t.end();
     });
@@ -359,6 +381,17 @@ test('getBlocksXML includes labels and XML entries in category order', t => {
         t.ok(labelIndex >= 0, 'Label XML should be present in the category');
         t.ok(xmlIndex >= 0, 'XML entry should be present in the category');
         t.ok(labelIndex < xmlIndex, 'Labels and XML entries should keep their declared order');
+        t.end();
+    });
+
+    runtime._registerExtensionPrimitives(testExtensionInfo);
+});
+
+test('getBlocksXML includes the extension colorStyle', t => {
+    const runtime = new Runtime();
+
+    runtime.on(Runtime.EXTENSION_ADDED, () => {
+        t.same(runtime.getBlocksXML()[0].colorStyle, testExtensionInfo.colorStyle);
         t.end();
     });
 

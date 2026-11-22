@@ -64,6 +64,12 @@ class Blocks {
             procedureDefinitions: {},
 
             /**
+             * Whether every procedure definition has been indexed
+             * @type {boolean}
+             */
+            procedureDefinitionsIndexed: false,
+
+            /**
              * A cache for execute to use and store on. Only available to
              * execute.
              * @type {object.<string, object>}
@@ -229,6 +235,32 @@ class Blocks {
     }
 
     /**
+     * Index every procedure definition on this block container.
+     *
+     * Each name is looked up once, so a container with many procedures would
+     * otherwise walk all of its blocks once per lookup.
+     * @private
+     */
+    _indexProcedureDefinitions () {
+        const definitions = this._cache.procedureDefinitions;
+
+        for (const id in this._blocks) {
+            if (!Object.prototype.hasOwnProperty.call(this._blocks, id)) continue;
+            const block = this._blocks[id];
+            if (block.opcode !== 'procedures_definition') continue;
+            const internal = this._getCustomBlockInternal(block);
+            const code = internal && internal.mutation && internal.mutation.proccode;
+
+            // The first definition of a name wins, as it does for a scan.
+            if (code && typeof definitions[code] === 'undefined') {
+                definitions[code] = id;
+            }
+        }
+
+        this._cache.procedureDefinitionsIndexed = true;
+    }
+
+    /**
      * Get the procedure definition for a given name.
      * @param {?string} name Name of procedure to query.
      * @returns {?string} ID of procedure definition.
@@ -239,20 +271,15 @@ class Blocks {
             return blockID;
         }
 
-        for (const id in this._blocks) {
-            if (!Object.prototype.hasOwnProperty.call(this._blocks, id)) continue;
-            const block = this._blocks[id];
-            if (block.opcode === 'procedures_definition') {
-                const internal = this._getCustomBlockInternal(block);
-                if (internal && internal.mutation.proccode === name) {
-                    this._cache.procedureDefinitions[name] = id; // The outer define block id
-                    return id;
-                }
-            }
+        if (!this._cache.procedureDefinitionsIndexed) {
+            this._indexProcedureDefinitions();
         }
 
-        this._cache.procedureDefinitions[name] = null;
-        return null;
+        if (typeof this._cache.procedureDefinitions[name] === 'undefined') {
+            this._cache.procedureDefinitions[name] = null;
+        }
+
+        return this._cache.procedureDefinitions[name];
     }
 
     /**
@@ -341,6 +368,16 @@ class Blocks {
                 for (let i = 0; i < newBlocks.length; i++) {
                     this.createBlock(newBlocks[i]);
                 }
+                break;
+            }
+            case 'block_input_collapse': {
+                const block = this._blocks[e.blockId];
+                if (!block) return;
+                const collapsedInputs = (block.collapsedInputs || [])
+                    .filter(inputName => inputName !== e.inputName);
+                if (e.newCollapsed) collapsedInputs.push(e.inputName);
+                block.collapsedInputs = collapsedInputs;
+                this.emitProjectChanged();
                 break;
             }
             case 'change':
@@ -578,11 +615,12 @@ class Blocks {
         this._cache.inputs = {};
         this._cache.procedureParamNames = {};
         this._cache.procedureDefinitions = {};
+        this._cache.procedureDefinitionsIndexed = false;
         this._cache._executeCached = {};
         this._cache._monitored = null;
         this._cache.scripts = {};
         if (this.runtime.compiler) {
-            this.runtime.compiler.invalidateCache(this);
+            this.runtime.compiler.recompileRunningScripts(this);
         }
     }
 
@@ -1163,10 +1201,13 @@ class Blocks {
         if (!block) return;
         // Encode properties of this block.
         const tagName = (block.shadow) ? 'shadow' : 'block';
+        const collapsedInputs = block.collapsedInputs && block.collapsedInputs.length > 0 ?
+            `collapsedinputs="${block.collapsedInputs.join(',')}"` : '';
         let xmlString =
             `<${tagName}
                 id="${block.id}"
                 type="${block.opcode}"
+                ${collapsedInputs}
                 ${block.topLevel ? `x="${block.x}" y="${block.y}"` : ''}
             >`;
         const commentId = block.comment;

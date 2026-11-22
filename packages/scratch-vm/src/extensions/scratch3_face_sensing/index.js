@@ -326,6 +326,7 @@ class Scratch3FaceSensingBlocks {
 
         return {
             id: 'faceSensing',
+            colorStyle: 'faceSensing',
             name: formatMessage({
                 id: 'faceSensing.categoryName',
                 default: 'Face Sensing',

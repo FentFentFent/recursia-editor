@@ -1047,6 +1047,11 @@ class VirtualMachine extends EventEmitter {
                     .map(runtimeTarget => runtimeTarget.sprite.name);
                 const oldName = sprite.name;
                 const newUnusedName = StringUtil.unusedName(newName, names);
+                // Most renames keep the name, including the "ensure unique name"
+                // pass over every target after a project load. Updating every
+                // block of every target for an unchanged name made loading slow
+                // as the project grew.
+                if (newUnusedName === oldName) return;
                 sprite.name = newUnusedName;
                 const allTargets = this.runtime.targets;
                 for (let i = 0; i < allTargets.length; i++) {
@@ -1054,7 +1059,7 @@ class VirtualMachine extends EventEmitter {
                     currTarget.blocks.updateAssetName(oldName, newName, 'sprite');
                 }
 
-                if (newUnusedName !== oldName) this.emitTargetsUpdate();
+                this.emitTargetsUpdate();
             }
         } else {
             throw new Error('No target with the provided id.');
@@ -1399,34 +1404,25 @@ class VirtualMachine extends EventEmitter {
      * of the current editing target's blocks.
      */
     emitWorkspaceUpdate () {
-        // Create a list of broadcast message Ids according to the stage variables
-        const stageVariables = this.runtime.getTargetForStage().variables;
-        let messageIds = [];
-        for (const varId in stageVariables) {
-            if (stageVariables[varId].type === Variable.BROADCAST_MESSAGE_TYPE) {
-                messageIds.push(varId);
-            }
-        }
-        // Go through all blocks on all targets, removing referenced
-        // broadcast ids from the list.
+        const stage = this.runtime.getTargetForStage();
+        // Collect the broadcast ids that blocks reference.
+        const usedMessageIds = new Set();
         for (let i = 0; i < this.runtime.targets.length; i++) {
             const currTarget = this.runtime.targets[i];
             const currBlocks = currTarget.blocks._blocks;
             for (const blockId in currBlocks) {
                 if (currBlocks[blockId].fields.BROADCAST_OPTION) {
-                    const id = currBlocks[blockId].fields.BROADCAST_OPTION.id;
-                    const index = messageIds.indexOf(id);
-                    if (index !== -1) {
-                        messageIds = messageIds.slice(0, index)
-                            .concat(messageIds.slice(index + 1));
-                    }
+                    usedMessageIds.add(currBlocks[blockId].fields.BROADCAST_OPTION.id);
                 }
             }
         }
-        // Anything left in messageIds is not referenced by a block, so delete it.
-        for (let i = 0; i < messageIds.length; i++) {
-            const id = messageIds[i];
-            delete this.runtime.getTargetForStage().variables[id];
+        // A broadcast no block references cannot be triggered, so delete it.
+        const stageVariables = stage.variables;
+        for (const varId in stageVariables) {
+            if (stageVariables[varId].type === Variable.BROADCAST_MESSAGE_TYPE &&
+                !usedMessageIds.has(varId)) {
+                delete stageVariables[varId];
+            }
         }
         const globalVarMap = Object.assign({}, this.runtime.getTargetForStage().variables);
         const localVarMap = this.editingTarget.isStage ?

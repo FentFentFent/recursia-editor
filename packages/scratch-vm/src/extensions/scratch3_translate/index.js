@@ -102,6 +102,7 @@ class Scratch3TranslateBlocks {
 
         return {
             id: 'translate',
+            colorStyle: 'translate',
             name: formatMessage({
                 id: 'translate.categoryName',
                 default: 'Translate',

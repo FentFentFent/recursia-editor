@@ -16,35 +16,72 @@ const getCategoryIconURI = extensionIcons => {
 const getExtensionColors = mode => getColorsForMode(mode).pen;
 
 /**
+ * Resolve an extension's or block's ColorStyle to the colors used in a color mode.
+ * Each color-mode key may hold either the colors for that mode or the name of a built-in block
+ * color style to extend; `base` is used for color modes without their own entry.
+ * @param {object} [colorStyle] - the extension's or block's color style, if any
+ * @param {string} mode - Color Mode name
+ * @returns {object|null} Blockly block style colors, or null if this color mode has no colors
+ */
+const getColorStyleColors = (colorStyle, mode) => {
+    if (!colorStyle) return null;
+
+    const styleForMode = colorStyle[mode] || colorStyle.base;
+    if (!styleForMode) return null;
+
+    // A color mode may extend a built-in block color style by name.
+    if (typeof styleForMode === 'string') {
+        const baseStyle = getColorsForMode(mode)[styleForMode];
+        if (!baseStyle) {
+            console.warn(`Unknown block color style "${styleForMode}" for color mode "${mode}"`);
+            return null;
+        }
+        return baseStyle;
+    }
+
+    return {
+        colourPrimary: styleForMode.color1,
+        colourSecondary: styleForMode.color2 || styleForMode.color1,
+        colourTertiary: styleForMode.color3 || styleForMode.color2 || styleForMode.color1,
+        colourQuaternary: styleForMode.color3 || styleForMode.color2 || styleForMode.color1
+    };
+};
+
+/**
  * Applies extension color mode to categories.
- * No changes are applied if called with the default color mode, allowing extensions to provide their own colors.
- * These colors are not seen if the category provides a blockIconURI.
+ * In the default color mode extensions keep the colors from their own metadata, unless they declare a
+ * colorStyle. These colors are not seen if the category provides a blockIconURI.
  * @param {Array.<object>} dynamicBlockXML - XML for each category of extension blocks, returned from getBlocksXML
  * in the vm runtime.
  * @param {string} mode - Color Mode name
  * @returns {Array.<object>} Dynamic block XML updated with colors.
  */
 const injectExtensionCategoryMode = (dynamicBlockXML, mode) => {
-    // Don't do any manipulation for the default mode
-    if (mode === DEFAULT_MODE) return dynamicBlockXML;
-
-    const extensionColors = getExtensionColors(mode);
     const extensionIcons = colorModeMap[mode].extensions;
     const parser = new DOMParser();
     const serializer = new XMLSerializer();
 
     return dynamicBlockXML.map(extension => {
+        const styleColors = getColorStyleColors(extension.colorStyle, mode);
+
+        // In the default mode, extensions keep the colors from their own metadata unless they
+        // declare a colorStyle.
+        if (mode === DEFAULT_MODE && !styleColors) return extension;
+
+        const colors = styleColors || getExtensionColors(mode);
         const dom = parser.parseFromString(extension.xml, 'text/xml');
 
         // This element is deserialized by Blockly, which uses the UK spelling
         // of "colour".
-        dom.documentElement.setAttribute('colour', extensionColors.colourPrimary);
+        dom.documentElement.setAttribute('colour', colors.colourPrimary);
         // Note: the category's secondaryColour matches up with the blocks' tertiary color, both used for border color.
-        dom.documentElement.setAttribute('secondaryColour', extensionColors.colourTertiary);
+        dom.documentElement.setAttribute('secondaryColour', colors.colourTertiary);
 
-        const categoryIconURI = getCategoryIconURI(extensionIcons[extension.id]);
-        if (categoryIconURI) {
-            dom.documentElement.setAttribute('iconURI', categoryIconURI);
+        if (mode !== DEFAULT_MODE) {
+            const categoryIconURI = getCategoryIconURI(extensionIcons[extension.id]);
+            if (categoryIconURI) {
+                dom.documentElement.setAttribute('iconURI', categoryIconURI);
+            }
         }
 
         return {
@@ -82,7 +119,8 @@ const injectExtensionBlockIcons = (blockInfoJson, mode) => {
 };
 
 export {
+    getColorStyleColors,
+    getExtensionColors,
     injectExtensionBlockIcons,
-    injectExtensionCategoryMode,
-    getExtensionColors
+    injectExtensionCategoryMode
 };

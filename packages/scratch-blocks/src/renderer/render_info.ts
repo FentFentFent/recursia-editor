@@ -7,8 +7,10 @@ import { getBlockCorners } from '../style/block_corners'
 import { getBlockPadding } from '../style/block_padding'
 import { BowlerHat } from './bowler_hat'
 import { ConstantProvider } from './constants'
+import InlineReporterMeasurable from './inline_reporter_measurable'
 import InlineStatementInput from '../inputs/inline_statement_input'
 import InlineStatementMeasurable from './inline_statement_measurable'
+import { SingleBlockInput } from '../inputs/single_block_input'
 import { SingleStatementInput } from '../inputs/single_statement_input'
 
 // Blockly's BlockSvg types previousConnection and nextConnection as non-null,
@@ -81,6 +83,21 @@ export class RenderInfo extends Blockly.zelos.RenderInfo {
         input: Blockly.Input,
         activeRow: Blockly.blockRendering.Row,
     ) {
+        // A single-block input holding a reporter is laid out like a value
+        // input, which puts the reporter in the slot instead of positioning it
+        // as if it were a stack.
+        if (input instanceof SingleBlockInput && input.holdsReporter()) {
+            activeRow.elements.push(
+                new InlineReporterMeasurable(this.constants_,input),
+            )
+
+            activeRow.hasInlineInput = true
+
+            activeRow.align ??= input.align;
+
+            return
+        }
+
         if (input instanceof InlineStatementInput || input instanceof SingleStatementInput) {
             activeRow.elements.push(
                 new InlineStatementMeasurable(this.constants_,input),

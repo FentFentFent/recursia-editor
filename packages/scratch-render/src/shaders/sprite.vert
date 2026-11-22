@@ -1,20 +1,36 @@
 precision mediump float;
 
 #ifdef DRAW_MODE_line
-uniform vec2 u_stageSize;
 uniform float u_lineThickness;
 uniform float u_lineLength;
 // The X and Y components of u_penPoints hold the first pen point. The Z and W components hold the difference between
 // the second pen point and the first. This is done because calculating the difference in the shader leads to floating-
 // point error when both points have large-ish coordinates.
 uniform vec4 u_penPoints;
+#endif
+
+#if defined(DRAW_MODE_line) || defined(DRAW_MODE_lineBatch)
+uniform vec2 u_stageSize;
 
 // Add this to divisors to prevent division by 0, which results in NaNs propagating through calculations.
 // Smaller values can cause problems on some mobile devices.
 const float epsilon = 1e-3;
 #endif
 
-#if !(defined(DRAW_MODE_line) || defined(DRAW_MODE_background))
+#ifdef DRAW_MODE_lineBatch
+// Batched pen lines carry their per-line values as vertex attributes so that many lines can be drawn at once.
+// a_penPoint holds the same values as u_penPoints does for a single line.
+attribute vec4 a_penPoint;
+attribute float a_lineLength;
+attribute float a_lineThickness;
+attribute vec4 a_lineColor;
+
+varying vec4 v_lineColor;
+varying float v_lineLength;
+varying float v_lineThickness;
+#endif
+
+#if !(defined(DRAW_MODE_line) || defined(DRAW_MODE_lineBatch) || defined(DRAW_MODE_background))
 uniform mat4 u_projectionMatrix;
 uniform mat4 u_modelMatrix;
 attribute vec2 a_texCoord;
@@ -66,6 +82,32 @@ void main() {
 	// 4. Apply view transform
 	position *= 2.0 / u_stageSize;
 	gl_Position = vec4(position, 0, 1);
+	#elif defined(DRAW_MODE_lineBatch)
+	// Same geometry as DRAW_MODE_line, with the line's values read from its vertex attributes.
+	vec2 position = a_position;
+	float expandedRadius = (a_lineThickness * 0.5) + 1.4142135623730951;
+
+	v_texCoord.x = mix(0.0, a_lineLength + (expandedRadius * 2.0), a_position.x) - expandedRadius;
+	v_texCoord.y = ((a_position.y - 0.5) * expandedRadius) + 0.5;
+
+	position.x *= a_lineLength + (2.0 * expandedRadius);
+	position.y *= 2.0 * expandedRadius;
+
+	position -= expandedRadius;
+
+	vec2 pointDiff = a_penPoint.zw;
+	pointDiff.x = (abs(pointDiff.x) < epsilon && abs(pointDiff.y) < epsilon) ? epsilon : pointDiff.x;
+	vec2 normalized = pointDiff / max(a_lineLength, epsilon);
+	position = mat2(normalized.x, normalized.y, -normalized.y, normalized.x) * position;
+
+	position += a_penPoint.xy;
+
+	position *= 2.0 / u_stageSize;
+	gl_Position = vec4(position, 0, 1);
+
+	v_lineColor = a_lineColor;
+	v_lineLength = a_lineLength;
+	v_lineThickness = a_lineThickness;
 	#elif defined(DRAW_MODE_background)
 	gl_Position = vec4(a_position * 2.0, 0, 1);
 	#else

@@ -18,6 +18,21 @@ const iconURI = `data:image/svg+xml,${encodeURIComponent(
 )}`;
 
 /**
+ * Category menu icon: the same glyph on a bubble in the category color.
+ * @type {string}
+ */
+const menuIconURI = `data:image/svg+xml,${encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">' +
+        '<circle cx="20" cy="20" r="20" fill="#FF8C1A"/>' +
+        '<g fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"' +
+            ' transform="translate(7 7) scale(0.65)">' +
+            '<path d="M17 6q-5 0-5 5v5.5q0 3.5-4 3.5 4 0 4 3.5V29q0 5 5 5"/>' +
+            '<path d="M23 6q5 0 5 5v5.5q0 3.5 4 3.5-4 0-4 3.5V29q0 5-5 5"/>' +
+        '</g>' +
+    '</svg>'
+)}`;
+
+/**
  * Variables that live on the thread running the block.
  * @type {string}
  */
@@ -65,16 +80,17 @@ class Scratch3TempVarsBlocks {
     getInfo () {
         return {
             id: 'tempvars',
+            colorStyle: 'tempvars',
             name: formatMessage({
                 id: 'tempvars.categoryName',
                 default: 'Temporary Variables',
                 description: 'Name of the extension that adds temporary variable blocks'
             }),
             blockIconURI: iconURI,
-            menuIconURI: iconURI,
-            color1: '#855CD6',
-            color2: '#774EC0',
-            color3: '#6844A9',
+            menuIconURI: menuIconURI,
+            color1: '#FF8C1A',
+            color2: '#FF8000',
+            color3: '#DB6E00',
             blocks: [
                 {
                     opcode: 'setVariable',

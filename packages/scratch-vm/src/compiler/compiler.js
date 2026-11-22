@@ -5,12 +5,15 @@ const CompileBlockContext = require('./compile-block-context');
 const CompiledThread = require('./compiled_thread');
 const CompileUtility = require('./compile_utility');
 const CompilerError = require('./CompilerError');
+const ir = require('./ir/index');
 const log = require('../util/log');
 const MathUtil = require('../util/math-util');
+const {optimize} = require('./optimization/index');
 const ScriptIR = require('./IR');
 const Sequencer = require('../engine/sequencer');
 const Thread = require('../engine/thread');
 const Timer = require('../util/timer');
+const transpile = require('./ir/transpile');
 
 /**
  * Argument types that hold blocks the primitive runs itself, by value of the
@@ -40,6 +43,17 @@ const STRUCTURAL_OPCODES = new Set([
 const STATEFUL_OPCODES = new Set([
 	'event_broadcastandwait',
 	'looks_switchbackdroptoandwait'
+]);
+
+/**
+ * Blocks that write a variable anywhere in the project, so its value cannot be
+ * treated as a constant by compiled scripts.
+ * @type {Set.<string>}
+ */
+const VARIABLE_WRITE_OPCODES = new Set([
+	'control_for_each',
+	'data_changevariableby',
+	'data_setvariableto'
 ]);
 
 /**
@@ -76,11 +90,13 @@ const invalidCompilationResult = (block, hint) => new CompilerError(
 );
 
 /**
- * Emits the source of one compiled script.
+ * Emits the intermediate representation of one compiled script.
  *
- * Emitters return the lines of code that run a block and, for reporters, the
- * expression that holds the reported value. Lines are returned relative to the
- * current indentation so control functions can nest the blocks they own.
+ * Emitters return the statements that run a block and, for reporters, the
+ * expression that holds the reported value. The statements are relative to the
+ * block they are in, so control functions can nest the blocks they own. The
+ * optimization stages transform the representation before the transpiler turns
+ * it into the source of the script.
  *
  * Reporters are compiled as statements followed by an expression: the
  * statements leave the value in a temporary, which lets reporters wait on
@@ -88,17 +104,30 @@ const invalidCompilationResult = (block, hint) => new CompilerError(
  */
 class ScriptEmitter {
 	/**
+	 * Number of warp-mode loop iterations between reads of the warp timer.
+	 *
+	 * A loop ends its turn at the first read that finds the warp time used up, so
+	 * this is also how many of its iterations can run past the warp time.
+	 * @type {number}
+	 */
+	static get WARP_LOOP_CHECKS () {
+		return 8;
+	}
+
+	/**
 	 * @param {Runtime} runtime Runtime the script runs in.
 	 * @param {RenderedTarget} target Target owning the script.
 	 * @param {string} scriptId Id of the script's first block.
 	 * @param {CompilationFunctions} functions Compilation functions to use.
+	 * @param {object} [optimization] Facts the optimization stages use.
 	 */
-	constructor (runtime, target, scriptId, functions) {
+	constructor (runtime, target, scriptId, functions, optimization = {}) {
 		this.runtime = runtime;
 		this.target = target;
 		this.blocks = target.blocks;
 		this.scriptId = scriptId;
 		this.functions = functions;
+		this.optimization = optimization;
 		this.utility = new CompileUtility();
 
 		/**
@@ -114,10 +143,10 @@ class ScriptEmitter {
 		this.procedureQueue = [];
 
 		/**
-		 * Sources of the emitted procedures.
-		 * @type {Array.<string>}
+		 * Procedures emitted for this script.
+		 * @type {Array.<object>}
 		 */
-		this.procedureSources = [];
+		this.procedureBodies = [];
 
 		/**
 		 * Arguments of the procedure being emitted, by argument name.
@@ -130,6 +159,13 @@ class ScriptEmitter {
 		 * @type {boolean}
 		 */
 		this.usesWarp = false;
+
+		/**
+		 * Whether the script calls a primitive, which can start a procedure the
+		 * script has to be able to run.
+		 * @type {boolean}
+		 */
+		this.mayStartProcedures = false;
 	}
 
 	/**
@@ -151,19 +187,27 @@ class ScriptEmitter {
 
 		// Validation of the block graph: missing blocks, malformed inputs and
 		// circular connections are reported here rather than by the emitter.
-		const ir = new ScriptIR(this.runtime, this.target, this.scriptId);
-		ir.captureSourceBlocks();
+		const scriptIR = new ScriptIR(this.runtime, this.target, this.scriptId);
+		scriptIR.captureSourceBlocks();
 
 		const body = [
-			'thread.requestScriptGlowInFrame = true;',
-			...this.stack(scriptBlock.next).lines
+			ir.statement('thread.requestScriptGlowInFrame = true'),
+			...this.stack(scriptBlock.next)
 		];
+
+		if (this.mayStartProcedures) {
+			this.queueProceduresStartedByPrimitives();
+		}
 
 		while (this.procedureQueue.length > 0) {
 			this.emitProcedure(this.procedureQueue.shift());
 		}
 
-		const compiled = this.buildSource(body, this.procedureSources);
+		if (this.mayStartProcedures) {
+			this.emitStartedProcedureDispatch();
+		}
+
+		const compiled = this.build(body);
 
 		return {
 			source: compiled.source,
@@ -193,22 +237,43 @@ class ScriptEmitter {
 	}
 
 	/**
-	 * Build the function that produces the script's generator.
-	 * @param {Array.<string>} body Script body lines.
-	 * @param {Array.<string>} procedures Sources of the script's procedures.
-	 * @returns {{body: Array.<string>, factory: Function, source: string}} Compiled source.
+	 * Optimize the representation and transpile it to JavaScript.
+	 * @param {Array.<object>} body Statements of the script body.
+	 * @returns {{body: Array.<object>, factory: Function, source: string}} Compiled source.
 	 */
-	buildSource (body, procedures) {
-		const header = [`const __WARP_TIME = ${Sequencer.WARP_TIME};`, ...this.utility.getHeaderLines()];
-		const source = [
-			'"use strict";',
-			...header,
-			...procedures.flatMap(procedure => procedure.split('\n')),
-			'return function* () {',
-			'\tconst __warp = false;',
-			...body.map(line => `\t${line}`),
-			'};'
-		].join('\n');
+	build (body) {
+		const procedures = this.procedureBodies.map(procedure => ({
+			...procedure,
+			body: optimize(procedure.body, this.optimization)
+		}));
+				const optimized = {
+			header: [
+				`const __WARP_TIME = ${Sequencer.WARP_TIME};`,
+				`const __WARP_LOOP_CHECKS = ${ScriptEmitter.WARP_LOOP_CHECKS};`,
+				`let __warpChecks = __WARP_LOOP_CHECKS;`
+			],
+			// The editor glows a whole script, so the block it is told about only
+			// has to belong to the script: reporting it once here is what the
+			// interpreter's per-block report amounts to.
+			body: optimize([
+				ir.statement('thread.blockGlowInFrame = ', ir.literal(this.scriptId)),
+				...body
+			], this.optimization),
+			procedures
+		};
+
+		// A declaration the optimization stages made unnecessary, such as the
+		// lookup of a variable they replaced with its value, is left out.
+		const used = transpile.collectIdentifiers(optimized);
+		const declared = this.utility.getHeaderLines().filter(line => {
+			const name = /^const (\w+)/.exec(line);
+
+			return name && used.has(name[1]);
+		});
+		const source = transpile({
+			...optimized,
+			header: [...optimized.header, ...declared]
+		});
 
 		// eslint-disable-next-line no-new-func
 		const factory = new Function(
@@ -243,27 +308,26 @@ class ScriptEmitter {
 		this.currentArguments = argumentsByName;
 
 		const definition = this.getBlock(procedure.definitionId);
-		const body = this.stack(definition.next);
-		const lines = [`function* ${procedure.name}(${[...parameters, '__callerWarp'].join(', ')}) {`];
-
-		lines.push(`\tconst __warp = ${procedure.warp} || __callerWarp;`);
+		const body = [
+			ir.statement('thread.blockGlowInFrame = ', ir.literal(procedure.definitionId)),
+			ir.declaration('const', '__warp', ir.source([String(procedure.warp), ' || __callerWarp']))
+		];
 
 		if (procedure.warp) {
-			lines.push('\tif (!thread.warpTimer) {');
-			lines.push('\t\tthread.warpTimer = new Timer();');
-			lines.push('\t\tthread.warpTimer.start();');
-			lines.push('\t}');
-			lines.push('\tthread.requestScriptGlowInFrame = true;');
+			body.push(
+				ir.ifThen(ir.source('!thread.warpTimer'), [
+					ir.statement('thread.warpTimer = new Timer()'),
+					ir.statement('thread.warpTimer.start()')
+				]),
+				ir.statement('thread.requestScriptGlowInFrame = true')
+			);
 		}
 
-		lines.push(...this.indent(body.lines, 1));
-
 		// A procedure that ends without returning still reports a value.
-		lines.push("\treturn '';");
-		lines.push('}');
+		body.push(...this.stack(definition.next), ir.returnStatement(ir.literal('')));
 
 		this.currentArguments = previousArguments;
-		this.procedureSources.push(lines.join('\n'));
+		this.procedureBodies.push({name: procedure.name, parameters, body});
 	}
 
 	/**
@@ -304,10 +368,79 @@ class ScriptEmitter {
 	}
 
 	/**
+	 * Queue every procedure on the target for emission.
+	 *
+	 * A primitive names the procedure it starts at runtime, so nothing in the
+	 * blocks says which procedures a script may run that way.
+	 */
+	queueProceduresStartedByPrimitives () {
+		for (const scriptId of this.blocks.getScripts()) {
+			const block = this.blocks.getBlock(scriptId);
+			const customBlockInput = block && block.opcode === 'procedures_definition' && block.inputs.custom_block;
+			const prototype = customBlockInput && this.blocks.getBlock(customBlockInput.block);
+			const procedureCode = prototype && prototype.mutation && prototype.mutation.proccode;
+
+			if (procedureCode) {
+				this.getProcedure(procedureCode);
+			}
+		}
+	}
+
+	/**
+	 * Emit the generator that runs a procedure a primitive started.
+	 *
+	 * The procedure is looked up by the code the primitive named, and its
+	 * parameters are read from the values the primitive pushed for it.
+	 */
+	emitStartedProcedureDispatch () {
+		let chain = [];
+		let returningChain = [];
+
+		for (const procedure of [...this.procedures.values()].reverse()) {
+			const args = procedure.argumentNames.map((argumentName, index) => {
+				const value = `__started.params[${quote(argumentName)}]`;
+				const fallback = quote(procedure.argumentDefaults[index] || '');
+
+				return `${value} === undefined ? ${fallback} : ${value}`;
+			});
+			const call = `${procedure.name}(${[...args, '__warp'].join(', ')})`;
+
+			chain = [ir.ifThen(
+				ir.source(['__started.procedureCode === ', quote(procedure.procedureCode)]),
+				[
+					ir.suspending(ir.source(`yield* ${call}`)),
+					ir.returnStatement()
+				],
+				chain
+			)];
+
+			returningChain = [ir.ifThen(
+				ir.source(['__started.procedureCode === ', quote(procedure.procedureCode)]),
+				[ir.returnStatement(ir.source(`yield* ${call}`))],
+				returningChain
+			)];
+		}
+
+		this.procedureBodies.push({
+			// The transpiler adds the caller's warp flag as the last parameter.
+			name: '__startedProcedure',
+			parameters: ['__started'],
+			body: [ir.declaration('const', '__warp', ir.source('__callerWarp')), ...chain]
+		});
+
+		this.procedureBodies.push({
+			// The same dispatch, handing the value the procedure returns to the block which started it.
+			name: '__startedReturningProcedure',
+			parameters: ['__started'],
+			body: [ir.declaration('const', '__warp', ir.source('__callerWarp')), ...returningChain]
+		});
+	}
+
+	/**
 	 * Emit a call to a procedure.
 	 * @param {object} block The call block.
 	 * @param {boolean} wantsValue Whether the call's value is used.
-	 * @returns {{lines: Array.<string>, source: ?string}} Call source.
+	 * @returns {{statements: Array.<object>, source: ?object}} Call source.
 	 */
 	callProcedure (block, wantsValue) {
 		const procedureCode = block.mutation && block.mutation.proccode;
@@ -321,47 +454,60 @@ class ScriptEmitter {
 			});
 		}
 
-		const lines = [];
+		const statements = [];
 		const args = procedure.argumentIds.map((argumentId, index) => {
 			const input = this.input(block, argumentId);
 
-			lines.push(...input.lines);
+			statements.push(...input.statements);
 
-			return input.source === 'undefined'
-				? quote(procedure.argumentDefaults[index])
-				: input.source;
+			return this.hasValue(input.source)
+				? input.source
+				: ir.literal(procedure.argumentDefaults[index]);
 		});
 
 		const depth = this.newVarName('depth');
 		const value = wantsValue ? this.newVarName('call') : null;
 
-		lines.push(`const ${depth} = util.frameDepth();`);
+		statements.push(ir.declaration('const', depth, ir.source('util.frameDepth()')));
 
-		const call = `yield* ${procedure.name}(${[...args, '__warp'].join(', ')})`;
+		const callParts = [`yield* ${procedure.name}(`];
+
+		for (const [index, arg] of [...args, '__warp'].entries()) {
+			if (index > 0) callParts.push(', ');
+			callParts.push(arg);
+		}
+
+		callParts.push(')');
+
+		const call = ir.source(callParts);
 
 		if (value) {
-			lines.push(`const ${value} = ${call};`);
+			const declaration = ir.declaration('const', value, call);
+
+			// The procedure can write variables the script has reads of.
+			declaration.clearsTypes = true;
+			statements.push(declaration);
 		} else {
-			lines.push(`${call};`);
+			statements.push(ir.suspending(call));
 		}
 
 		// A procedure can return from the middle of a block, which leaves that
 		// block's frame behind. Drop everything the procedure pushed.
-		lines.push(`util.unwindTo(${depth});`);
+		statements.push(ir.statement('util.unwindTo(', depth, ')'));
 
-		return wantsValue ? {lines, source: value} : {lines};
+		return wantsValue ? {statements, source: ir.source([value])} : {statements};
 	}
 
 	/**
 	 * Emit the value a block reports.
 	 * @param {object} block Block to compile.
-	 * @returns {{lines: Array.<string>, source: string}} Expression source.
+	 * @returns {{statements: Array.<object>, source: object}} Expression source.
 	 */
 	expression (block) {
 		const literal = this.getLiteral(block);
 
 		if (literal !== null) {
-			return {lines: [], source: literal};
+			return {statements: [], source: literal};
 		}
 
 		const emitter = this.functions.getExpression(block.opcode);
@@ -376,32 +522,29 @@ class ScriptEmitter {
 	/**
 	 * Emit the blocks that follow one another starting at a block.
 	 * @param {?string} firstId Id of the first block.
-	 * @returns {{lines: Array.<string>}} Statement source.
+	 * @returns {Array.<object>} Statement nodes.
 	 */
 	stack (firstId) {
-		const lines = [];
+		const statements = [];
 		let block = firstId ? this.getBlock(firstId) : null;
 
 		while (block) {
-			lines.push(...this.statement(block).lines);
+			statements.push(...this.statement(block));
 			block = block.next ? this.getBlock(block.next) : null;
 		}
 
-		return {lines};
+		return statements;
 	}
 
 	/**
 	 * Emit a block used as a statement.
 	 * @param {object} block Block to compile.
-	 * @returns {{lines: Array.<string>}} Statement source.
+	 * @returns {Array.<object>} Statement nodes.
 	 */
 	statement (block) {
 		const emitter = this.functions.getStatement(block.opcode);
-		const compiled = emitter ? emitter(this, block) : this.compileCall(block, false);
 
-		return {
-			lines: [`thread.blockGlowInFrame = ${quote(block.id)};`, ...compiled.lines]
-		};
+		return (emitter ? emitter(this, block) : this.compileCall(block, false)).statements;
 	}
 
 	/**
@@ -413,7 +556,7 @@ class ScriptEmitter {
 	 * exactly like they do when the interpreter runs them.
 	 * @param {object} block Block to compile.
 	 * @param {boolean} wantsValue Whether the block's value is used.
-	 * @returns {{lines: Array.<string>, source: ?string}} Block source.
+	 * @returns {{statements: Array.<object>, source: ?object}} Block source.
 	 */
 	compileCall (block, wantsValue) {
 		const compile = this.runtime.getCompileFunction(block.opcode);
@@ -440,7 +583,7 @@ class ScriptEmitter {
 	 * @param {object} block Block to compile.
 	 * @param {boolean} wantsValue Whether the block's value is used.
 	 * @param {Function} compile Compilation function the extension registered.
-	 * @returns {{lines: Array.<string>, source: ?string}} Block source.
+	 * @returns {{statements: Array.<object>, source: ?object}} Block source.
 	 */
 	emitExtensionCompilation (block, wantsValue, compile) {
 		this.assertExecutable(block);
@@ -464,14 +607,14 @@ class ScriptEmitter {
 			);
 		}
 
-		const lines = [...context.lines];
+		const statements = [...context.statements];
 		let source = null;
 
 		if (typeof result === 'string') {
 			if (wantsValue) {
-				source = result;
+				source = ir.source(result);
 			} else {
-				lines.push(result);
+				statements.push(ir.line(result));
 			}
 		} else if (result && typeof result === 'object') {
 			if (typeof result.lines !== 'undefined') {
@@ -479,11 +622,11 @@ class ScriptEmitter {
 					throw invalidCompilationResult(block, 'Return the lines as an array of source lines.');
 				}
 
-				lines.push(...result.lines);
+				statements.push(...result.lines.map(line => ir.line(line)));
 			}
 
 			if (typeof result.source === 'string') {
-				source = result.source;
+				source = ir.source(result.source);
 			}
 		} else {
 			throw invalidCompilationResult(block, 'Return the source of the block, or an object of lines and source.');
@@ -494,14 +637,14 @@ class ScriptEmitter {
 				throw invalidCompilationResult(block, 'A block whose value is used must return the source of its value.');
 			}
 
-			return {lines, source};
+			return {statements, source};
 		}
 
-		if (lines.length === context.lines.length) {
+		if (statements.length === context.statements.length) {
 			throw invalidCompilationResult(block, 'A block that runs must return the lines that run it.');
 		}
 
-		return {lines};
+		return {statements};
 	}
 
 	/**
@@ -513,7 +656,7 @@ class ScriptEmitter {
 	 * are run again when they yield, like the interpreter runs them.
 	 * @param {object} block Block to compile.
 	 * @param {boolean} wantsValue Whether the block's value is used.
-	 * @returns {{lines: Array.<string>, source: ?string}} Block source.
+	 * @returns {{statements: Array.<object>, source: ?object}} Block source.
 	 */
 	coreCall (block, wantsValue) {
 		if (STATEFUL_OPCODES.has(block.opcode)) {
@@ -528,25 +671,50 @@ class ScriptEmitter {
 		const value = this.newVarName('value');
 		const status = this.newVarName('status');
 
-		const lines = [
-			...args.lines,
-			`let ${value};`,
-			'{',
-			`\tlet ${result} = ${primitive}(${args.source}, util);`,
-			`\tif (${result} !== null && typeof ${result} === 'object' && typeof ${result}.then === 'function') {`,
-			`\t\t${result} = yield Signals.promise(${result});`,
-			`\t}`,
-			`\t${value} = ${result};`,
-			`\tif (thread.status !== ${Thread.STATUS_RUNNING} || thread.isKilled) {`,
-			`\t\tconst ${status} = thread.isKilled ? ${Thread.STATUS_DONE} : thread.status;`,
-			`\t\tthread.status = ${Thread.STATUS_RUNNING};`,
-			`\t\tif (${status} === ${Thread.STATUS_DONE}) return;`,
-			`\t\tif (${status} === ${Thread.STATUS_YIELD_TICK}) yield Signals.TICK; else yield Signals.YIELD;`,
-			`\t}`,
-			'}'
+		const statements = [
+			...args.statements,
+			ir.declaration('let', value),
+			ir.block([
+				ir.declaration('let', result, ir.source([primitive, '(', args.source, ', util)'])),
+				ir.ifThen(
+					ir.source([
+						result, ' !== null && typeof ', result,
+						" === 'object' && typeof ", result, ".then === 'function'"
+					]),
+					[ir.assignment(ir.source([result]), ir.source(['yield Signals.promise(', result, ')']))]
+				),
+				ir.assignment(ir.source([value]), ir.source([result])),
+				ir.ifThen(
+					ir.source([
+						'thread.status !== ', String(Thread.STATUS_RUNNING), ' || thread.isKilled'
+					]),
+					[
+						ir.declaration(
+							'const',
+							status,
+							ir.source([
+								'thread.isKilled ? ', String(Thread.STATUS_DONE), ' : thread.status'
+							])
+						),
+						ir.assignment(
+							ir.source('thread.status'),
+							ir.source([String(Thread.STATUS_RUNNING)])
+						),
+						ir.ifThen(
+							ir.source([status, ' === ', String(Thread.STATUS_DONE)]),
+							[ir.returnStatement()]
+						),
+						ir.ifThen(
+							ir.source([status, ' === ', String(Thread.STATUS_YIELD_TICK)]),
+							[ir.yieldStatement(ir.source('Signals.TICK'))],
+							[ir.yieldStatement(ir.source('Signals.YIELD'))]
+						)
+					]
+				)
+			])
 		];
 
-		return wantsValue ? {lines, source: value} : {lines};
+		return wantsValue ? {statements, source: ir.source([value])} : {statements};
 	}
 
 	/**
@@ -559,10 +727,16 @@ class ScriptEmitter {
 	 * @param {object} block Block to compile.
 	 * @param {boolean} wantsValue Whether the block's value is used.
 	 * @param {{branches: boolean}} [options] Whether the block may ask for branches.
-	 * @returns {{lines: Array.<string>, source: ?string}} Block source.
+	 * @returns {{statements: Array.<object>, source: ?object}} Block source.
 	 */
 	emitPrimitiveCall (block, wantsValue, {branches = true} = {}) {
 		this.assertExecutable(block);
+		// An extension's primitive can start a procedure, such as a class constructor,
+		// so the script needs the dispatch to the compiled procedures to run it.
+		const mayStartProcedure = !this.runtime.isCoreOpcode(block.opcode);
+		if (mayStartProcedure) {
+			this.mayStartProcedures = true;
+		}
 
 		const primitive = this.getPrimitiveName(block.opcode);
 		const args = this.buildArguments(block);
@@ -573,70 +747,135 @@ class ScriptEmitter {
 		const status = this.newVarName('status');
 		const returned = this.newVarName('returned');
 
-		const branchLines = branches ? [
-			`\t\t} else if (util.branch !== null) {`,
-			`\t\t\tconst ${branch} = util.takeBranch();`,
-			`\t\t\t${value} = ${result};`,
-			...this.indent(this.branchDispatch(block, branch), 3),
-			// A loop keeps its stack frame between passes, the way the sequencer
-			// reuses the frame of the loop block it just stepped.
-			`\t\t\tif (${branch}.isLoop) {`,
-			...this.indent(this.loopYield(), 4),
-			`\t\t\t} else {`,
-			`\t\t\t\t${done} = true;`,
-			`\t\t\t}`
-		] : [];
+		let chain = ir.ifThen(
+			ir.source(['thread.status !== ', String(Thread.STATUS_RUNNING)]),
+			[
+				ir.declaration('const', status, ir.source('thread.status')),
+				ir.assignment(ir.source('thread.status'), ir.source([String(Thread.STATUS_RUNNING)])),
+				ir.ifThen(
+					ir.source([status, ' === ', String(Thread.STATUS_DONE)]),
+					[ir.statement('util.leaveBlock()'), ir.returnStatement()]
+				),
+				ir.ifThen(
+					ir.source([status, ' === ', String(Thread.STATUS_YIELD_TICK)]),
+					[ir.yieldStatement(ir.source('Signals.TICK'))],
+					[ir.yieldStatement(ir.source('Signals.YIELD'))]
+				)
+			],
+			[
+				ir.assignment(ir.source([value]), ir.source([result])),
+				ir.assignment(ir.source([done]), ir.literal(true))
+			]
+		);
 
-		const lines = [
-			...args.lines,
+		chain = ir.ifThen(
+			ir.source('util.returned'),
+			[
+				ir.declaration('const', returned, ir.source('util.takeReturnValue()')),
+				ir.statement('util.leaveBlock()'),
+				ir.returnStatement(ir.source([returned]))
+			],
+			[chain]
+		);
+
+		chain = ir.ifThen(
+			ir.source('util.stopped'),
+			[ir.statement('util.leaveBlock()'), ir.returnStatement()],
+			[chain]
+		);
+
+		if (branches) {
+			chain = ir.ifThen(
+				ir.source('util.branch !== null'),
+				[
+					ir.declaration('const', branch, ir.source('util.takeBranch()')),
+					ir.assignment(ir.source([value]), ir.source([result])),
+					...this.branchDispatch(block, branch),
+					// A loop keeps its stack frame between passes, the way the
+					// sequencer reuses the frame of the loop block it just stepped.
+					ir.ifThen(
+						ir.source([branch, '.isLoop']),
+						this.loopYield(),
+						[ir.assignment(ir.source([done]), ir.literal(true))]
+					)
+				],
+				[chain]
+			);
+		}
+
+		// A procedure the primitive started runs before the block finishes, the way the
+		// sequencer steps into it before the calling block's script continues. The block
+		// still needs the rest of the chain, which decides whether it is done.
+		if (mayStartProcedure) {
+			const procedureValue = this.newVarName('procedureValue');
+			const returnedProcedureValue = ir.declaration(
+				'const',
+				procedureValue,
+				ir.source('yield* __startedReturningProcedure(util.takeStartedReturningProcedure(), __warp)')
+			);
+
+			// The procedure can write variables the script has reads of.
+			returnedProcedureValue.clearsTypes = true;
+
+			// A procedure the primitive needs the value of runs, and the block runs again so
+			// that it reports that value, the way the interpreter resumes it with the value.
+			chain = ir.ifThen(
+				ir.source('util.startedReturningProcedure !== null'),
+				[
+					returnedProcedureValue,
+					ir.statement('util.setReturnedProcedureValue(', procedureValue, ')')
+				],
+				[
+					ir.block([
+						ir.ifThen(
+							ir.source('util.startedProcedure !== null'),
+							[ir.suspending(ir.source('yield* __startedProcedure(util.takeStartedProcedure(), __warp)'))]
+						),
+						chain
+					])
+				]
+			);
+		}
+
+		const statements = [
+			...args.statements,
 			// Declared outside the block so a reporter's value stays in scope.
-			`let ${value};`,
-			'{',
-			`\tutil.enterBlock(${quote(block.id)});`,
-			`\tlet ${done} = false;`,
-			`\twhile (!${done}) {`,
-			`\t\tlet ${result} = ${primitive}(${args.source}, util);`,
-			`\t\tif (${result} !== null && typeof ${result} === 'object' && typeof ${result}.then === 'function') {`,
-			`\t\t\t${result} = yield Signals.promise(${result});`,
-			`\t\t\t${value} = ${result};`,
-			`\t\t\t${done} = true;`,
-			...branchLines,
-			`\t\t} else if (util.stopped) {`,
-			`\t\t\tutil.leaveBlock();`,
-			`\t\t\treturn;`,
-			`\t\t} else if (util.returned) {`,
-			`\t\t\tconst ${returned} = util.takeReturnValue();`,
-			`\t\t\tutil.leaveBlock();`,
-			`\t\t\treturn ${returned};`,
-			`\t\t} else if (thread.status !== ${Thread.STATUS_RUNNING}) {`,
-			`\t\t\tconst ${status} = thread.status;`,
-			`\t\t\tthread.status = ${Thread.STATUS_RUNNING};`,
-			`\t\t\tif (${status} === ${Thread.STATUS_DONE}) {`,
-			`\t\t\t\tutil.leaveBlock();`,
-			`\t\t\t\treturn;`,
-			`\t\t\t}`,
-			`\t\t\tif (${status} === ${Thread.STATUS_YIELD_TICK}) yield Signals.TICK; else yield Signals.YIELD;`,
-			`\t\t} else {`,
-			`\t\t\t${value} = ${result};`,
-			`\t\t\t${done} = true;`,
-			`\t\t}`,
-			`\t}`,
-			`\tutil.leaveBlock();`,
-			'}'
+			ir.declaration('let', value),
+			ir.block([
+				ir.statement('util.enterBlock(', ir.literal(block.id), ')'),
+				ir.declaration('let', done, ir.literal(false)),
+				ir.whileLoop(ir.source(['!', done]), [
+					ir.declaration('let', result, ir.source([primitive, '(', args.source, ', util)'])),
+					ir.ifThen(
+						ir.source([
+							result, ' !== null && typeof ', result,
+							" === 'object' && typeof ", result, ".then === 'function'"
+						]),
+						[
+							ir.assignment(
+								ir.source([result]),
+								ir.source(['yield Signals.promise(', result, ')'])
+							),
+							ir.assignment(ir.source([value]), ir.source([result])),
+							ir.assignment(ir.source([done]), ir.literal(true))
+						],
+						[chain]
+					)
+				]),
+				ir.statement('util.leaveBlock()')
+			])
 		];
 
-		return wantsValue ? {lines, source: value} : {lines};
+		return wantsValue ? {statements, source: ir.source([value])} : {statements};
 	}
 
 	/**
 	 * Emit the branches a primitive may ask the script to run.
 	 * @param {object} block Block owning the branches.
 	 * @param {string} branch Name of the variable holding the requested branch.
-	 * @returns {Array.<string>} Source lines.
+	 * @returns {Array.<object>} Statement nodes.
 	 */
 	branchDispatch (block, branch) {
-		const lines = [];
-		const emitted = new Set();
 		const inputs = block.inputs || {};
 		const argumentsInfo = this.runtime.getBlockArguments(block.opcode);
 		const branchInputs = [];
@@ -653,19 +892,22 @@ class ScriptEmitter {
 			}
 		}
 
+		const emitted = [];
+		let chain = null;
+
 		for (const firstId of branchInputs) {
-			if (!firstId || emitted.has(firstId)) continue;
-
-			emitted.add(firstId);
-			lines.push(`${lines.length === 0 ? 'if' : '} else if'} (${branch}.blockId === ${quote(firstId)}) {`);
-			lines.push(...this.indent(this.stack(firstId).lines, 1));
+			if (!firstId || emitted.includes(firstId)) continue;
+			emitted.push(firstId);
 		}
 
-		if (lines.length > 0) {
-			lines.push('}');
+		for (const firstId of emitted.slice().reverse()) {
+			const test = ir.source([branch, '.blockId === ', ir.literal(firstId)]);
+			const body = this.stack(firstId);
+
+			chain = chain ? ir.ifThen(test, body, [chain]) : ir.ifThen(test, body);
 		}
 
-		return lines;
+		return chain ? [chain] : [];
 	}
 
 	/**
@@ -676,25 +918,45 @@ class ScriptEmitter {
 	 * ends the frame, so the loop runs once per frame. Otherwise it only gives
 	 * the other threads their turn. A loop that runs without screen refresh
 	 * keeps iterating, and ends its turn only when the warp time is used up.
-	 * @returns {Array.<string>} Source lines.
+	 *
+	 * The warp time is read once every `__WARP_LOOP_CHECKS` iterations instead of
+	 * every iteration, because reading the clock costs more than most iterations
+	 * do. The read still happens often enough that a loop ends its turn within
+	 * `__WARP_LOOP_CHECKS` iterations of the warp time being used up.
+	 * @returns {Array.<object>} Statement nodes.
 	 */
 	loopYield () {
 		return [
-			'if (__warp) {',
-			'\tif (thread.warpTimer && thread.warpTimer.timeElapsed() > __WARP_TIME) yield Signals.TICK;',
-			'} else if (runtime.redrawRequested) {',
-			'\tyield Signals.TICK;',
-			'} else {',
-			'\tyield Signals.YIELD;',
-			'}'
+			ir.ifThen(
+				ir.source('__warp'),
+				[
+					ir.ifThen(
+						ir.source('--__warpChecks <= 0'),
+						[
+							ir.statement('__warpChecks = __WARP_LOOP_CHECKS'),
+							ir.ifThen(
+								ir.source('thread.warpTimer && thread.warpTimer.timeElapsed() > __WARP_TIME'),
+								[ir.yieldStatement(ir.source('Signals.TICK'))]
+							)
+						]
+					)
+				],
+				[
+					ir.ifThen(
+						ir.source('runtime.redrawRequested'),
+						[ir.yieldStatement(ir.source('Signals.TICK'))],
+						[ir.yieldStatement(ir.source('Signals.YIELD'))]
+					)
+				]
+			)
 		];
 	}
 
 	/**
-	 * Source of a block that holds a single value, such as a number or text
+	 * Expression of a block that holds a single value, such as a number or text
 	 * block, or null when the block is not one.
 	 * @param {object} block Block to check.
-	 * @returns {?string} Source of the value.
+	 * @returns {?object} Expression of the value.
 	 */
 	getLiteral (block) {
 		if (this.runtime.getOpcodeFunction(block.opcode)) {
@@ -711,28 +973,41 @@ class ScriptEmitter {
 			return null;
 		}
 
-		return quote(String(block.fields[fieldNames[0]].value));
+		return ir.literal(String(block.fields[fieldNames[0]].value));
 	}
 
 	/**
 	 * Emit the arguments object a primitive is called with.
 	 * @param {object} block Block whose fields and inputs to emit.
-	 * @returns {{lines: Array.<string>, source: string}} Arguments source.
+	 * @returns {{statements: Array.<object>, source: object}} Arguments source.
 	 */
 	buildArguments (block) {
 		const parts = [];
-		const lines = [];
+		const statements = [];
 		const fields = block.fields || {};
 		const inputs = block.inputs || {};
 		const argumentsInfo = this.runtime.getBlockArguments(block.opcode);
+		let first = true;
+
+		const add = part => {
+			if (!first) parts.push(', ');
+			first = false;
+			parts.push(part);
+		};
+
+		// The interpreter gives every primitive the block's mutation, which an extension block
+		// reads for state such as the layout the project gave it.
+		if (block.mutation) {
+			add(`${quote('mutation')}: ${JSON.stringify(block.mutation)}`);
+		}
 
 		for (const name of Object.keys(fields)) {
 			const field = fields[name];
 
 			if (name === 'VARIABLE' || name === 'LIST' || name === 'BROADCAST_OPTION') {
-				parts.push(`${quote(name)}: {id: ${quote(field.id ?? null)}, name: ${quote(field.value ?? null)}}`);
+				add(`${quote(name)}: {id: ${quote(field.id ?? null)}, name: ${quote(field.value ?? null)}}`);
 			} else {
-				parts.push(`${quote(name)}: ${quote(field.value)}`);
+				add(`${quote(name)}: ${quote(field.value)}`);
 			}
 		}
 
@@ -748,7 +1023,7 @@ class ScriptEmitter {
 
 			if (blockInputType) {
 				// The primitive runs these blocks itself through the utility.
-				parts.push(`${quote(name)}: {blockId: ${quote(input.block || null)}, type: ${quote(blockInputType)}}`);
+				add(`${quote(name)}: {blockId: ${quote(input.block || null)}, type: ${quote(blockInputType)}}`);
 				continue;
 			}
 
@@ -763,65 +1038,74 @@ class ScriptEmitter {
 			if (name === 'BROADCAST_INPUT') {
 				const option = this.broadcastOption(block);
 
-				lines.push(...option.lines);
-				parts.push(`BROADCAST_OPTION: ${option.source}`);
+				statements.push(...option.statements);
+				add(ir.source(['BROADCAST_OPTION: ', option.source]));
 			} else {
 				const value = this.expression(child);
 
-				lines.push(...value.lines);
-				parts.push(`${quote(name)}: ${value.source}`);
+				statements.push(...value.statements);
+				add(ir.source([quote(name), ': ', value.source]));
 			}
 		}
 
-		return {lines, source: `{${parts.join(', ')}}`};
+		return {statements, source: ir.source(['{', ...parts, '}'])};
 	}
 
 	/**
-	 * Source of an input's value.
+	 * Emit an input's value.
 	 * @param {object} block Block owning the input.
 	 * @param {string} name Name of the input.
-	 * @returns {{lines: Array.<string>, source: string}} Expression source.
+	 * @returns {{statements: Array.<object>, source: object}} Expression source.
 	 */
 	input (block, name) {
 		const input = (block.inputs || {})[name];
 
 		if (!input) {
-			return {lines: [], source: 'undefined'};
+			return {statements: [], source: ir.literal(undefined)};
 		}
 
 		const childId = input.block ?? input.shadow;
 
 		if (!childId) {
-			return {lines: [], source: 'undefined'};
+			return {statements: [], source: ir.literal(undefined)};
 		}
 
 		return this.expression(this.getBlock(childId));
 	}
 
 	/**
-	 * Source of several inputs, evaluated in the order the block lists them.
+	 * Emit several inputs, evaluated in the order the block lists them.
 	 * @param {object} block Block owning the inputs.
 	 * @param {Array.<string>} names Names of the inputs.
-	 * @returns {{lines: Array.<string>, sources: object.<string, string>}} Input sources.
+	 * @returns {{statements: Array.<object>, sources: object.<string, object>}} Input sources.
 	 */
 	inputs (block, names) {
 		const order = Object.keys(block.inputs || {});
 		const sorted = names.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
-		const lines = [];
+		const statements = [];
 		const sources = Object.create(null);
 
 		for (const name of sorted) {
 			const input = this.input(block, name);
 
-			lines.push(...input.lines);
+			statements.push(...input.statements);
 			sources[name] = input.source;
 		}
 
-		return {lines, sources};
+		return {statements, sources};
 	}
 
 	/**
-	 * Value of a field.
+	 * Whether an expression carries a value.
+	 * @param {object} expression Expression to check.
+	 * @returns {boolean} True unless the expression is `undefined`.
+	 */
+	hasValue (expression) {
+		return !(expression.type === 'literal' && typeof expression.value === 'undefined');
+	}
+
+	/**
+	 * Source of a field's value.
 	 * @param {object} block Block owning the field.
 	 * @param {string} name Name of the field.
 	 * @returns {string} Source of the field's value.
@@ -837,16 +1121,16 @@ class ScriptEmitter {
 	}
 
 	/**
-	 * Source of the message a broadcast block sends.
+	 * Emit the message a broadcast block sends.
 	 * @param {object} block Block owning the BROADCAST_INPUT input.
-	 * @returns {{lines: Array.<string>, source: string}} Source of the message.
+	 * @returns {{statements: Array.<object>, source: object}} Source of the message.
 	 */
 	broadcastOption (block) {
 		const input = (block.inputs || {}).BROADCAST_INPUT;
 		const childId = input && (input.block ?? input.shadow);
 
 		if (!childId) {
-			return {lines: [], source: '{id: null, name: null}'};
+			return {statements: [], source: ir.source('{id: null, name: null}')};
 		}
 
 		const child = this.getBlock(childId);
@@ -855,16 +1139,18 @@ class ScriptEmitter {
 		// The dropdown is a menu block: its field holds the message id and name.
 		if (menu && !this.runtime.getOpcodeFunction(child.opcode)) {
 			return {
-				lines: [],
-				source: `{id: ${quote(menu.id ?? null)}, name: ${quote(menu.value ?? null)}}`
+				statements: [],
+				source: ir.source([
+					'{id: ', ir.literal(menu.id ?? null), ', name: ', ir.literal(menu.value ?? null), '}'
+				])
 			};
 		}
 
 		const message = this.expression(child);
 
 		return {
-			lines: message.lines,
-			source: `{id: null, name: Cast.toString(${message.source})}`
+			statements: message.statements,
+			source: ir.source(['{id: null, name: Cast.toString(', message.source, ')}'])
 		};
 	}
 
@@ -880,12 +1166,12 @@ class ScriptEmitter {
 	}
 
 	/**
-	 * Source of the variable a block refers to.
-	 * @param {object} block Block owning the VARIABLE field.
+	 * Field that names the variable a block uses.
+	 * @param {object} block Block owning the field.
 	 * @param {string} name Name of the field.
-	 * @returns {string} Source of the variable lookup.
+	 * @returns {object} The field.
 	 */
-	variable (block, name) {
+	variableField (block, name) {
 		const field = (block.fields || {})[name];
 
 		if (!field) {
@@ -895,32 +1181,107 @@ class ScriptEmitter {
 			});
 		}
 
-		return `target.lookupOrCreateVariable(${quote(field.id ?? null)}, ${quote(field.value ?? '')})`;
+		return field;
 	}
 
 	/**
-	 * Source of the argument a block reports.
+	 * Identifier holding the variable a block refers to.
+	 *
+	 * The lookup runs once when the script starts, not once per block, so reads
+	 * and writes compile to a property access.
+	 * @param {object} block Block owning the VARIABLE field.
+	 * @param {string} name Name of the field.
+	 * @returns {string} Identifier of the variable.
+	 */
+	variableReference (block, name) {
+		const field = this.variableField(block, name);
+
+		return this.utility.declare(
+			`variable:${field.id ?? field.value}`,
+			'variable',
+			`target.lookupOrCreateVariable(${quote(field.id ?? null)}, ${quote(field.value ?? '')})`
+		);
+	}
+
+	/**
+	 * Lookup of the variable a block refers to.
+	 * @param {object} block Block owning the VARIABLE field.
+	 * @param {string} name Name of the field.
+	 * @returns {object} Expression of the variable lookup.
+	 */
+	variable (block, name) {
+		const field = this.variableField(block, name);
+
+		return ir.variable(field.id ?? null, field.value ?? '', this.variableReference(block, name));
+	}
+
+	/**
+	 * Read of the variable a block refers to.
+	 * @param {object} block Block owning the VARIABLE field.
+	 * @param {string} name Name of the field.
+	 * @returns {object} Expression of the variable's value.
+	 */
+	variableValue (block, name) {
+		const field = this.variableField(block, name);
+
+		return ir.variableValue(field.id ?? null, field.value ?? '', this.variableReference(block, name));
+	}
+
+	/**
+	 * Emit an expression as a number.
+	 *
+	 * A literal is converted while the script is compiled, so the generated code
+	 * holds the number itself. An expression already known to produce a number is
+	 * left alone, and everything else is converted at runtime.
+	 * @param {object} expression Expression to convert.
+	 * @returns {object} Expression that evaluates to a number.
+	 */
+	number (expression) {
+		if (!expression) return ir.number(0);
+		if (expression.type === 'number') return expression;
+
+		if (expression.type === 'literal') {
+			return ir.number(Cast.toNumber(expression.value));
+		}
+
+		return ir.cast('number', expression);
+	}
+
+	/**
+	 * Emit an expression as a boolean.
+	 * @param {object} expression Expression to convert.
+	 * @returns {object} Expression that evaluates to a boolean.
+	 */
+	boolean (expression) {
+		if (!expression) return ir.literal(false);
+		if (expression.type === 'literal') return ir.literal(Cast.toBoolean(expression.value));
+
+		return ir.cast('boolean', expression);
+	}
+
+	/**
+	 * Emit the argument a block reports.
 	 * @param {object} block Argument reporter block.
-	 * @returns {{lines: Array.<string>, source: string}} Expression source.
+	 * @returns {{statements: Array.<object>, source: object}} Expression source.
 	 */
 	argument (block) {
 		const field = (block.fields || {}).VALUE;
 		const local = this.currentArguments && field && this.currentArguments.get(field.value);
 
 		// Argument reporters outside a procedure report 0, like the engine does.
-		return {lines: [], source: local || '0'};
+		return {statements: [], source: ir.source([local || '0'])};
 	}
 
 	/**
 	 * Emit the value a procedure returns.
 	 * @param {object} block The return block.
-	 * @returns {{lines: Array.<string>}} Statement source.
+	 * @returns {{statements: Array.<object>}} Statement nodes.
 	 */
 	returnValue (block) {
 		const value = this.input(block, 'VALUE');
-		const returned = value.source === 'undefined' ? "''" : value.source;
+		const returned = this.hasValue(value.source) ? value.source : ir.literal('');
 
-		return {lines: [...value.lines, `return ${returned};`]};
+		return {statements: [...value.statements, ir.returnStatement(returned)]};
 	}
 
 	/**
@@ -984,6 +1345,24 @@ class ScriptEmitter {
 	}
 
 	/**
+	 * Render an expression as JavaScript, for extension compilation functions.
+	 * @param {object} expression Expression to render.
+	 * @returns {string} Source of the expression.
+	 */
+	render (expression) {
+		return transpile.renderExpression(expression);
+	}
+
+	/**
+	 * Render statements as JavaScript lines, for extension compilation functions.
+	 * @param {Array.<object>} statements Statements to render.
+	 * @returns {Array.<string>} Source lines.
+	 */
+	renderStatements (statements) {
+		return transpile.renderStatements(statements, 0);
+	}
+
+	/**
 	 * Ensure a block can be run by its primitive.
 	 * @param {object} block Block to check.
 	 */
@@ -1040,6 +1419,13 @@ class Compiler {
 		 * @type {WeakMap.<object, Map.<string, ?object>>}
 		 */
 		this.cache = new WeakMap();
+
+		/**
+		 * Variables that cannot change while the project runs, with the value
+		 * compiled scripts use instead of reading them.
+		 * @type {?Map.<string, {value: *}>}
+		 */
+		this.variableAnalysis = null;
 
 		this.emitted = [];
 	}
@@ -1119,13 +1505,81 @@ class Compiler {
 	}
 
 	/**
+	 * Find the variables that no block in the project writes.
+	 *
+	 * The value of such a variable cannot change while the project runs, so
+	 * compiled scripts can read it as a literal instead of looking it up. Cloud
+	 * variables and variables a monitor can change are left out.
+	 * @returns {Map.<string, {value: *}>} Constant values by variable id.
+	 */
+	analyzeVariables () {
+		if (this.variableAnalysis) {
+			return this.variableAnalysis;
+		}
+
+		const constants = new Map();
+		const written = new Set();
+		const mutable = new Set();
+
+		for (const target of this.runtime.targets) {
+			for (const variable of Object.values(target.variables || {})) {
+				constants.set(variable.id, {value: variable.value});
+
+				if (variable.isCloud) mutable.add(variable.id);
+			}
+
+			if (!target.blocks) continue;
+
+			for (const block of target.blocks.getBlocksList()) {
+				const field = (block.fields || {}).VARIABLE;
+
+				if (!field) continue;
+
+				if (VARIABLE_WRITE_OPCODES.has(block.opcode)) {
+					written.add(field.id);
+				} else if (block.opcode === 'data_showvariable') {
+					// Showing a variable lets the user change it in its monitor.
+					mutable.add(field.id);
+				}
+			}
+		}
+
+		for (const target of this.runtime.targets) {
+			for (const block of target.blocks ? target.blocks.getBlocksList() : []) {
+				const field = (block.fields || {}).LIST;
+
+				if (field && block.opcode === 'data_showlist') mutable.add(field.id);
+			}
+		}
+
+		for (const block of this.runtime.monitorBlocks.getBlocksList()) {
+			const field = (block.fields || {}).VARIABLE;
+
+			if (field && block.isMonitored) mutable.add(field.id);
+		}
+
+		for (const id of written) constants.delete(id);
+		for (const id of mutable) constants.delete(id);
+
+		this.variableAnalysis = constants;
+
+		return constants;
+	}
+
+	/**
 	 * Compile a script.
 	 * @param {RenderedTarget} target Target owning the script.
 	 * @param {string} scriptId Id of the script's first block.
 	 * @returns {object} The compiled script.
 	 */
 	compileScript (target, scriptId) {
-		const emitter = new ScriptEmitter(this.runtime, target, scriptId, this.functions);
+		const emitter = new ScriptEmitter(
+			this.runtime,
+			target,
+			scriptId,
+			this.functions,
+			{constants: this.analyzeVariables()}
+		);
 		const compiled = emitter.emit();
 
 		this.emitted = compiled.source.split('\n');
@@ -1157,6 +1611,30 @@ class Compiler {
 	 */
 	invalidateCache (blocks) {
 		this.cache.delete(blocks);
+		this.variableAnalysis = null;
+	}
+
+	/**
+	 * Drop the compiled scripts of a block container and give its running
+	 * threads the scripts compiled from its current blocks.
+	 *
+	 * A thread keeps the generator of the script it started, so an edit made
+	 * while the script runs would otherwise keep running the old JavaScript.
+	 * The replacement script starts from the top on the thread's next step.
+	 * @param {Blocks} blocks Container whose blocks changed.
+	 */
+	recompileRunningScripts (blocks) {
+		this.invalidateCache(blocks);
+
+		const threads = this.runtime.threads.filter(thread =>
+			thread.isCompiled && !thread.isKilled && thread.blockContainer === blocks);
+
+		for (const thread of threads) {
+			const script = this.getCompiledScript(thread.target, blocks, thread.topBlock);
+
+			// A script that no longer compiles keeps running what it has.
+			if (script) thread.replaceScript(script);
+		}
 	}
 
 	/**
@@ -1165,6 +1643,7 @@ class Compiler {
 	 */
 	invalidateAll () {
 		this.cache = new WeakMap();
+		this.variableAnalysis = null;
 	}
 
 	/**

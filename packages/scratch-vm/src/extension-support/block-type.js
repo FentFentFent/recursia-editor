@@ -51,6 +51,13 @@ const BlockType = {
     LABEL: 'label', 
 
     /**
+     * A top-level block with no previous or next connection which describes project metadata instead
+     * of a step in a script, such as a class definition. The runtime runs every meta block in a project
+     * when the project starts, so the metadata exists before any script runs.
+     */
+    META: 'meta',
+
+    /**
      * XML that is inserted into the flyout as a block.
      */
     XML: 'xml'

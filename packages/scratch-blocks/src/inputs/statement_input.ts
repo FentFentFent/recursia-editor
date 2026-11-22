@@ -1,4 +1,5 @@
 import * as Blockly from 'blockly/core'
+import { BlockInputCollapse } from '../events/events_block_input_collapse'
 
 /** Size, in workspace units, of the button that collapses and expands a statement input. */
 const TOGGLE_ICON_SIZE = 16
@@ -73,11 +74,15 @@ export class CollapsibleStatementInput extends Blockly.inputs.StatementInput {
   /**
    * Fold or unfold the input's contents and update the button to match.
    * @param collapsed True to fold the contents away.
+   * @param opt_fireEvent Whether to fire a Blockly event describing the
+   *     change, so that listeners such as the VM and undo can follow it.
+   *     Callers restoring saved state pass false.
    */
-  setCollapsed(collapsed: boolean): void {
+  setCollapsed(collapsed: boolean, opt_fireEvent = true): void {
     if (collapsed === this.collapsed_) {
       return
     }
+    const oldCollapsed = this.collapsed_
     this.collapsed_ = collapsed
 
     this.toggleField.setValue(this.media_ + (collapsed ? EXPAND_ICON : COLLAPSE_ICON))
@@ -88,6 +93,10 @@ export class CollapsibleStatementInput extends Blockly.inputs.StatementInput {
     const sourceBlock = this.getSourceBlock()
     if (sourceBlock instanceof Blockly.BlockSvg) {
       sourceBlock.render()
+    }
+
+    if (opt_fireEvent) {
+      Blockly.Events.fire(new BlockInputCollapse(sourceBlock, this.name, collapsed, oldCollapsed))
     }
   }
 

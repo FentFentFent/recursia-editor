@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the motion blocks.
  *
@@ -125,23 +127,20 @@ const bounce = emit => emit.helper('motion:bounce', 'bounce', `target => {
 /**
  * Emit a glide to a position.
  * @param {ScriptEmitter} emit Compiler emitting the block.
- * @param {object} block The glide block.
- * @param {{lines: Array.<string>, source: string}} seconds Glide duration.
- * @param {{lines: Array.<string>, source: string}} x End x position.
- * @param {{lines: Array.<string>, source: string}} y End y position.
- * @returns {{lines: Array.<string>}} Block source.
+ * @param {{statements: Array.<object>, source: object}} seconds Glide duration.
+ * @param {{statements: Array.<object>, source: object}} x End x position.
+ * @param {{statements: Array.<object>, source: object}} y End y position.
+ * @returns {{statements: Array.<object>}} Block source.
  */
-const emitGlide = (emit, block, seconds, x, y) => ({
-	lines: [
-		...seconds.lines,
-		...x.lines,
-		...y.lines,
-		`yield* ${glide(emit)}(
-			target,
-			Cast.toNumber(${seconds.source}),
-			Cast.toNumber(${x.source}),
-			Cast.toNumber(${y.source})
-		);`.replace(/\n\t*/g, ' ')
+const emitGlide = (emit, seconds, x, y) => ({
+	statements: [
+		...seconds.statements,
+		...x.statements,
+		...y.statements,
+		ir.suspending(
+			'yield* ', glide(emit), '(target, ', emit.number(seconds.source), ', ',
+			emit.number(x.source), ', ', emit.number(y.source), ')'
+		)
 	]
 });
 
@@ -157,11 +156,17 @@ const limitPrecision = emit => emit.helper('motion:limitPrecision', 'limitPrecis
 
 module.exports = {
 	expressions: {
-		motion_xposition: emit => ({lines: [], source: `${limitPrecision(emit)}(target.x)`}),
+		motion_xposition: emit => ({
+			statements: [],
+			source: ir.source([limitPrecision(emit), '(target.x)'])
+		}),
 
-		motion_yposition: emit => ({lines: [], source: `${limitPrecision(emit)}(target.y)`}),
+		motion_yposition: emit => ({
+			statements: [],
+			source: ir.source([limitPrecision(emit), '(target.y)'])
+		}),
 
-		motion_direction: () => ({lines: [], source: 'target.direction'})
+		motion_direction: () => ({statements: [], source: ir.source('target.direction')})
 	},
 	statements: {
 		motion_movesteps: (emit, block) => {
@@ -171,14 +176,18 @@ module.exports = {
 			const dy = emit.newVarName('dy');
 
 			return {
-				lines: [
-					...steps.lines,
-					'{',
-					`\tconst ${radians} = MathUtil.degToRad(90 - target.direction);`,
-					`\tconst ${dx} = Cast.toNumber(${steps.source}) * Math.cos(${radians});`,
-					`\tconst ${dy} = Cast.toNumber(${steps.source}) * Math.sin(${radians});`,
-					`\ttarget.setXY(target.x + ${dx}, target.y + ${dy});`,
-					'}'
+				statements: [
+					...steps.statements,
+					ir.block([
+						ir.declaration('const', radians, ir.source('MathUtil.degToRad(90 - target.direction)')),
+						ir.declaration('const', dx, ir.source([
+							emit.number(steps.source), ' * Math.cos(', radians, ')'
+						])),
+						ir.declaration('const', dy, ir.source([
+							emit.number(steps.source), ' * Math.sin(', radians, ')'
+						])),
+						ir.statement('target.setXY(target.x + ', dx, ', target.y + ', dy, ')')
+					])
 				]
 			};
 		},
@@ -187,9 +196,12 @@ module.exports = {
 			const inputs = emit.inputs(block, ['X', 'Y']);
 
 			return {
-				lines: [
-					...inputs.lines,
-					`target.setXY(Cast.toNumber(${inputs.sources.X}), Cast.toNumber(${inputs.sources.Y}));`
+				statements: [
+					...inputs.statements,
+					ir.statement(
+						'target.setXY(', emit.number(inputs.sources.X), ', ',
+						emit.number(inputs.sources.Y), ')'
+					)
 				]
 			};
 		},
@@ -199,19 +211,20 @@ module.exports = {
 			const position = emit.newVarName('position');
 
 			return {
-				lines: [
-					...to.lines,
-					'{',
-					`\tconst ${position} = ${targetXY(emit)}(${to.source});`,
-					`\tif (${position}) target.setXY(${position}[0], ${position}[1]);`,
-					'}'
+				statements: [
+					...to.statements,
+					ir.block([
+						ir.declaration('const', position, ir.source([targetXY(emit), '(', to.source, ')'])),
+						ir.ifThen(ir.source([position]), [
+							ir.statement('target.setXY(', position, '[0], ', position, '[1])')
+						])
+					])
 				]
 			};
 		},
 
 		motion_glidesecstoxy: (emit, block) => emitGlide(
 			emit,
-			block,
 			emit.input(block, 'SECS'),
 			emit.input(block, 'X'),
 			emit.input(block, 'Y')
@@ -223,15 +236,18 @@ module.exports = {
 			const position = emit.newVarName('position');
 
 			return {
-				lines: [
-					...secs.lines,
-					...to.lines,
-					'{',
-					`\tconst ${position} = ${targetXY(emit)}(${to.source});`,
-					`\tif (${position}) {`,
-					`\t\tyield* ${glide(emit)}(target, Cast.toNumber(${secs.source}), ${position}[0], ${position}[1]);`,
-					`\t}`,
-					'}'
+				statements: [
+					...secs.statements,
+					...to.statements,
+					ir.block([
+						ir.declaration('const', position, ir.source([targetXY(emit), '(', to.source, ')'])),
+						ir.ifThen(ir.source([position]), [
+							ir.suspending(
+								'yield* ', glide(emit), '(target, ', emit.number(secs.source), ', ',
+								position, '[0], ', position, '[1])'
+							)
+						])
+					])
 				]
 			};
 		},
@@ -240,7 +256,12 @@ module.exports = {
 			const degrees = emit.input(block, 'DEGREES');
 
 			return {
-				lines: [...degrees.lines, `target.setDirection(target.direction + Cast.toNumber(${degrees.source}));`]
+				statements: [
+					...degrees.statements,
+					ir.statement(
+						'target.setDirection(target.direction + ', emit.number(degrees.source), ')'
+					)
+				]
 			};
 		},
 
@@ -248,7 +269,12 @@ module.exports = {
 			const degrees = emit.input(block, 'DEGREES');
 
 			return {
-				lines: [...degrees.lines, `target.setDirection(target.direction - Cast.toNumber(${degrees.source}));`]
+				statements: [
+					...degrees.statements,
+					ir.statement(
+						'target.setDirection(target.direction - ', emit.number(degrees.source), ')'
+					)
+				]
 			};
 		},
 
@@ -256,7 +282,10 @@ module.exports = {
 			const direction = emit.input(block, 'DIRECTION');
 
 			return {
-				lines: [...direction.lines, `target.setDirection(Cast.toNumber(${direction.source}));`]
+				statements: [
+					...direction.statements,
+					ir.statement('target.setDirection(', emit.number(direction.source), ')')
+				]
 			};
 		},
 
@@ -265,52 +294,80 @@ module.exports = {
 			const direction = emit.newVarName('direction');
 
 			return {
-				lines: [
-					...towards.lines,
-					'{',
-					`\tconst ${direction} = ${directionTowards(emit)}(target, ${towards.source});`,
-					`\tif (${direction} !== null) target.setDirection(${direction});`,
-					'}'
+				statements: [
+					...towards.statements,
+					ir.block([
+						ir.declaration('const', direction, ir.source([
+							directionTowards(emit), '(target, ', towards.source, ')'
+						])),
+						ir.ifThen(ir.source([direction, ' !== null']), [
+							ir.statement('target.setDirection(', direction, ')')
+						])
+					])
 				]
 			};
 		},
 
 		motion_ifonedgebounce: emit => ({
-			lines: [`${bounce(emit)}(target);`]
+			statements: [ir.statement(bounce(emit), '(target)')]
 		}),
 
 		motion_setrotationstyle: (emit, block) => ({
-			lines: [`target.setRotationStyle(${emit.field(block, 'STYLE')});`]
+			statements: [ir.statement('target.setRotationStyle(', emit.field(block, 'STYLE'), ')')]
 		}),
 
 		motion_changexby: (emit, block) => {
 			const dx = emit.input(block, 'DX');
 
-			return {lines: [...dx.lines, `target.setXY(target.x + Cast.toNumber(${dx.source}), target.y);`]};
+			return {
+				statements: [
+					...dx.statements,
+					ir.statement(
+						'target.setXY(target.x + ', emit.number(dx.source), ', target.y)'
+					)
+				]
+			};
 		},
 
 		motion_setx: (emit, block) => {
 			const x = emit.input(block, 'X');
 
-			return {lines: [...x.lines, `target.setXY(Cast.toNumber(${x.source}), target.y);`]};
+			return {
+				statements: [
+					...x.statements,
+					ir.statement('target.setXY(', emit.number(x.source), ', target.y)')
+				]
+			};
 		},
 
 		motion_changeyby: (emit, block) => {
 			const dy = emit.input(block, 'DY');
 
-			return {lines: [...dy.lines, `target.setXY(target.x, target.y + Cast.toNumber(${dy.source}));`]};
+			return {
+				statements: [
+					...dy.statements,
+					ir.statement(
+						'target.setXY(target.x, target.y + ', emit.number(dy.source), ')'
+					)
+				]
+			};
 		},
 
 		motion_sety: (emit, block) => {
 			const y = emit.input(block, 'Y');
 
-			return {lines: [...y.lines, `target.setXY(target.x, Cast.toNumber(${y.source}));`]};
+			return {
+				statements: [
+					...y.statements,
+					ir.statement('target.setXY(target.x, ', emit.number(y.source), ')')
+				]
+			};
 		},
 
-		motion_scroll_right: () => ({lines: []}),
-		motion_scroll_up: () => ({lines: []}),
-		motion_align_scene: () => ({lines: []}),
-		motion_xscroll: () => ({lines: []}),
-		motion_yscroll: () => ({lines: []})
+		motion_scroll_right: () => ({statements: []}),
+		motion_scroll_up: () => ({statements: []}),
+		motion_align_scene: () => ({statements: []}),
+		motion_xscroll: () => ({statements: []}),
+		motion_yscroll: () => ({statements: []})
 	}
 };

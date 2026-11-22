@@ -756,6 +756,7 @@ class Scratch3MusicBlocks {
     getInfo () {
         return {
             id: 'music',
+            colorStyle: 'music',
             name: formatMessage({
                 id: 'music.categoryName',
                 default: 'Music',

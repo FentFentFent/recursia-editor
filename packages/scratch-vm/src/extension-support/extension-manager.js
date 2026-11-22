@@ -4,6 +4,7 @@ const maybeFormatMessage = require('../util/maybe-format-message');
 
 const BlockType = require('./block-type');
 const { newApi } = require('./extension-api/api.js');
+const { resolveColorStyle } = require('./color_styles');
 
 // These extensions are currently built into the VM repository but should not be loaded at startup.
 // TODO: move these out into a separate repository?
@@ -26,7 +27,12 @@ const builtinExtensions = {
     boost: () => require('../extensions/scratch3_boost'),
     gdxfor: () => require('../extensions/scratch3_gdx_for'),
     faceSensing: () => require('../extensions/scratch3_face_sensing'),
-    tempvars: () => require('../extensions/scratch3_tempvars')
+    tempvars: () => require('../extensions/scratch3_tempvars'),
+    gamepad: () => require('../extensions/scratch3_gamepad'),
+    http: () => require('../extensions/scratch3_http'),
+    textUtils: () => require('../extensions/scratch3_text_utils'),
+    arithmetic: () => require('../extensions/scratch3_arithmetic'),
+    collections: () => require('../extensions/scratch3_collections')
 };
 
 /**
@@ -50,6 +56,7 @@ const builtinExtensions = {
  * @property {string} color1 - the primary color for this category, in '#rrggbb' format
  * @property {string} color2 - the secondary color for this category, in '#rrggbb' format
  * @property {string} color3 - the tertiary color for this category, in '#rrggbb' format
+ * @property {ColorStyle} [colorStyle] - the color style for this category, if the extension declared one
  * @property {Array.<ConvertedBlockInfo>} blocks - the blocks, separators, etc. in this category
  * @property {Array.<object>} menus - the menus provided by this category
  */
@@ -375,6 +382,12 @@ class ExtensionManager {
         }, []);
         extensionInfo.menus = extensionInfo.menus || {};
         extensionInfo.menus = this._prepareMenuInfo(serviceName, extensionInfo.menus);
+        const resolvedColorStyle = resolveColorStyle(extensionInfo.colorStyle, extensionInfo.id);
+        if (resolvedColorStyle) {
+            extensionInfo.colorStyle = resolvedColorStyle;
+        } else {
+            delete extensionInfo.colorStyle;
+        }
         return extensionInfo;
     }
 
@@ -465,6 +478,12 @@ class ExtensionManager {
         }, blockInfo);
         blockInfo.opcode = blockInfo.opcode && this._sanitizeID(blockInfo.opcode);
         blockInfo.text = blockInfo.text || blockInfo.opcode;
+        const resolvedColorStyle = resolveColorStyle(blockInfo.colorStyle, blockInfo.opcode);
+        if (resolvedColorStyle) {
+            blockInfo.colorStyle = resolvedColorStyle;
+        } else {
+            delete blockInfo.colorStyle;
+        }
 
         switch (blockInfo.blockType) {
         case BlockType.EVENT:
@@ -493,6 +512,12 @@ class ExtensionManager {
             }
 
             const funcName = blockInfo.func ? this._sanitizeID(blockInfo.func) : blockInfo.opcode;
+
+            // A block with a mutator has part of its layout, such as its argument inputs, given to it by
+            // the user at runtime. Its layout therefore travels in its mutation instead of its block info.
+            if (blockInfo.mutator) {
+                blockInfo.isDynamic = true;
+            }
 
             const getBlockInfo = blockInfo.isDynamic ?
                 args => args && args.mutation && args.mutation.blockInfo :

@@ -49,6 +49,21 @@ import gdxforConnectionSmallIconURL from './gdxfor/gdxfor-small.svg';
 import faceSensingIconURL from './faceSensing/faceSensing.png';
 import faceSensingInsetIconURL from './faceSensing/faceSensing-small.svg';
 
+import gamepadIconURL from './gamepad/gamepad.svg';
+import gamepadInsetIconURL from './gamepad/gamepad-small.svg';
+
+import httpIconURL from './http/http.svg';
+import httpInsetIconURL from './http/http-small.svg';
+
+import textUtilsIconURL from './textUtils/textUtils.svg';
+import textUtilsInsetIconURL from './textUtils/textUtils-small.svg';
+
+import arithmeticIconURL from './arithmetic/arithmetic.svg';
+import arithmeticInsetIconURL from './arithmetic/arithmetic-small.svg';
+
+import collectionsIconURL from './collections/collections.svg';
+import collectionsInsetIconURL from './collections/collections-small.svg';
+
 import customIconURL from './custom/custom.png'
 import tempvarsIconURL from './tempvars/tempvars.png';
 
@@ -169,6 +184,107 @@ export default [
                 defaultMessage="Sense faces with the camera."
                 description="Description for the 'Face Sensing' extension"
                 id="gui.extension.faceSensing.description"
+            />
+        ),
+        featured: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Gamepad"
+                description="Name for the 'Gamepad' extension"
+                id="gui.extension.gamepad.name"
+            />
+        ),
+        extensionId: 'gamepad',
+        iconURL: gamepadIconURL,
+        insetIconURL: gamepadInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Play with a game controller."
+                description="Description for the 'Gamepad' extension"
+                id="gui.extension.gamepad.description"
+            />
+        ),
+        featured: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Web Requests"
+                description="Name for the 'Web Requests' extension"
+                id="gui.extension.http.name"
+            />
+        ),
+        extensionId: 'http',
+        iconURL: httpIconURL,
+        insetIconURL: httpInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Send requests to websites and read the responses."
+                description="Description for the 'Web Requests' extension"
+                id="gui.extension.http.description"
+            />
+        ),
+        featured: true,
+        internetConnectionRequired: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Text Utilities"
+                description="Name for the 'Text Utilities' extension"
+                id="gui.extension.textUtils.name"
+            />
+        ),
+        extensionId: 'textUtils',
+        iconURL: textUtilsIconURL,
+        insetIconURL: textUtilsInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Rewrite and search text with patterns."
+                description="Description for the 'Text Utilities' extension"
+                id="gui.extension.textUtils.description"
+            />
+        ),
+        featured: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Arithmetic"
+                description="Name for the 'Arithmetic' extension"
+                id="gui.extension.arithmetic.name"
+            />
+        ),
+        extensionId: 'arithmetic',
+        iconURL: arithmeticIconURL,
+        insetIconURL: arithmeticInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Powers, roots, atan2 and more maths helpers."
+                description="Description for the 'Arithmetic' extension"
+                id="gui.extension.arithmetic.description"
+            />
+        ),
+        featured: true
+    },
+    {
+        name: (
+            <FormattedMessage
+                defaultMessage="Collections"
+                description="Name for the 'Collections' extension"
+                id="gui.extension.collections.name"
+            />
+        ),
+        extensionId: 'collections',
+        iconURL: collectionsIconURL,
+        insetIconURL: collectionsInsetIconURL,
+        description: (
+            <FormattedMessage
+                defaultMessage="Classes with multiple inheritance, plus maps, arrays and JSON."
+                description="Description for the 'Collections' extension"
+                id="gui.extension.collections.description"
             />
         ),
         featured: true

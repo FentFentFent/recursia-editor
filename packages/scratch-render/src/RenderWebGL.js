@@ -156,6 +156,9 @@ class RenderWebGL extends EventEmitter {
         /** @type {Array<int>} */
         this._drawList = [];
 
+        /** @type {boolean} */
+        this._highQualityPen = false;
+
         // A list of layer group names in the order they should appear
         // from furthest back to furthest in front.
         /** @type {Array<string>} */
@@ -255,6 +258,12 @@ class RenderWebGL extends EventEmitter {
         if (canvas.width !== newWidth || canvas.height !== newHeight) {
             canvas.width = newWidth;
             canvas.height = newHeight;
+            // Pen layers are rendered at the canvas's resolution, so they have to follow it.
+            for (const skin of this._allSkins) {
+                if (skin instanceof PenSkin) {
+                    skin.updateTexture();
+                }
+            }
             // Resizing the canvas causes it to be cleared, so redraw it.
             this.draw();
         }
@@ -371,9 +380,34 @@ class RenderWebGL extends EventEmitter {
      */
     createPenSkin () {
         const skinId = this._nextSkinId++;
-        const newSkin = new PenSkin(skinId, this);
+        const newSkin = new PenSkin(skinId, this, this._highQualityPen);
         this._allSkins[skinId] = newSkin;
         return skinId;
+    }
+
+    /**
+     * Enable or disable high-quality pen rendering. A high-quality pen layer is drawn at twice the display resolution
+     * and then scaled down, which supersamples pen lines and stamps for extra antialiasing. Pen layers keep their
+     * contents when this setting changes.
+     * @param {boolean} enabled - Whether to render pen layers at high quality.
+     */
+    setHighQualityPen (enabled) {
+        enabled = !!enabled;
+        if (enabled === this._highQualityPen) return;
+
+        this._highQualityPen = enabled;
+        for (const skin of this._allSkins) {
+            if (skin instanceof PenSkin) {
+                skin.setHighQuality(enabled);
+            }
+        }
+    }
+
+    /**
+     * @returns {boolean} whether pen layers are rendered at high quality.
+     */
+    getHighQualityPen () {
+        return this._highQualityPen;
     }
 
     /**
@@ -649,6 +683,13 @@ class RenderWebGL extends EventEmitter {
      * Draw all current drawables and present the frame on the canvas.
      */
     draw () {
+        // Pen lines are queued up as they're drawn, so make sure they reach the pen layer before it's used.
+        for (const skin of this._allSkins) {
+            if (skin instanceof PenSkin) {
+                skin.flushLines();
+            }
+        }
+
         this._doExitDrawRegion();
 
         const gl = this._gl;
@@ -1648,19 +1689,25 @@ class RenderWebGL extends EventEmitter {
             return;
         }
 
-        this._doExitDrawRegion();
-
         const skin = /** @type {PenSkin} */ this._allSkins[penSkinID];
+
+        // The stamp is drawn into the pen layer too, so the lines queued before it have to go first.
+        skin.flushLines();
+
+        this._doExitDrawRegion();
 
         const gl = this._gl;
         twgl.bindFramebufferInfo(gl, skin._framebuffer);
 
         // Limit size of viewport to the bounds around the stamp Drawable and create the projection matrix for the draw.
+        // The pen layer's texture may be larger than the stage, so its coordinates are in texels rather than stage
+        // units.
+        const [textureScaleX, textureScaleY] = skin.textureScale;
         gl.viewport(
-            (this._nativeSize[0] * 0.5) + bounds.left,
-            (this._nativeSize[1] * 0.5) - bounds.top,
-            bounds.width,
-            bounds.height
+            ((this._nativeSize[0] * 0.5) + bounds.left) * textureScaleX,
+            ((this._nativeSize[1] * 0.5) - bounds.top) * textureScaleY,
+            bounds.width * textureScaleX,
+            bounds.height * textureScaleY
         );
         const projection = twgl.m4.ortho(bounds.left, bounds.right, bounds.top, bounds.bottom, -1, 1);
 

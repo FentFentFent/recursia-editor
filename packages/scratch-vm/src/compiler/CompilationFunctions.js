@@ -9,11 +9,11 @@ const procedures = require('./compilation_functions/procedures');
 const sensing = require('./compilation_functions/sensing');
 
 /**
- * Registry of the functions that turn individual blocks into source code.
+ * Registry of the functions that turn individual blocks into IR.
  *
  * An expression function receives the emitter and the block and returns the
- * lines that have to run first and the expression that holds the reported
- * value. A statement function returns the lines that run the block.
+ * statements that have to run first and the expression that holds the reported
+ * value. A statement function returns the statements that run the block.
  *
  * Opcodes without an entry are compiled through their block primitive instead,
  * which the compiler does itself.

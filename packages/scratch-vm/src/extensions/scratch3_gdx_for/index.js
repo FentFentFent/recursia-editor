@@ -630,6 +630,7 @@ class Scratch3GdxForBlocks {
     getInfo () {
         return {
             id: Scratch3GdxForBlocks.EXTENSION_ID,
+            colorStyle: 'gdxfor',
             name: Scratch3GdxForBlocks.EXTENSION_NAME,
             blockIconURI: blockIconURI,
             menuIconURI: menuIconURI,

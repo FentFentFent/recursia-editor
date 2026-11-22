@@ -293,6 +293,9 @@ const serializeBlock = function (block) {
     if (block.comment) {
         obj.comment = block.comment;
     }
+    if (block.collapsedInputs && block.collapsedInputs.length > 0) {
+        obj.collapsedInputs = block.collapsedInputs;
+    }
     return obj;
 };
 

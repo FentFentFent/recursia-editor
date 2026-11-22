@@ -134,18 +134,47 @@ class CompiledThread extends Thread {
 	awaitPromise (promise) {
 		this.status = Thread.STATUS_PROMISE_WAIT;
 
+		// A script replaced while it waits has already moved past the promise.
+		const script = this.script;
+
 		Promise.resolve(promise).then(value => {
-			if (this.isKilled || this.status === Thread.STATUS_DONE) return;
+			if (this.isKilled || this.status === Thread.STATUS_DONE || this.script !== script) return;
 
 			this.resumeValue = value;
 			this.status = Thread.STATUS_RUNNING;
 		}, reason => {
-			if (this.isKilled || this.status === Thread.STATUS_DONE) return;
+			if (this.isKilled || this.status === Thread.STATUS_DONE || this.script !== script) return;
 
 			log.warn('Compiled script promise rejected: ', reason);
 			this.resumeValue = undefined;
 			this.status = Thread.STATUS_RUNNING;
 		});
+	}
+
+	/**
+	 * Replace the compiled script this thread runs.
+	 *
+	 * The thread starts the new script from the top on its next step, with a
+	 * new utility, so it runs the JavaScript compiled from the blocks as they
+	 * are now. Frames the old script left on the stack belong to blocks that
+	 * may no longer exist, so they are dropped.
+	 * @param {object} script Compiled script.
+	 */
+	replaceScript (script) {
+		this.script = script;
+		this.generator = null;
+		this.resumeValue = undefined;
+
+		while (this.stack.length > 1) {
+			this.popStack();
+		}
+
+		// The thread no longer waits for whatever the old script was awaiting.
+		if (this.status !== Thread.STATUS_DONE) {
+			this.status = Thread.STATUS_RUNNING;
+		}
+
+		this.warpTimer = null;
 	}
 
 	/**

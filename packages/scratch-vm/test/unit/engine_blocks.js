@@ -579,6 +579,52 @@ test('block_field_intermediate_change updates field value', t => {
     t.end();
 });
 
+test('block_input_collapse stores collapsed inputs and serializes them to XML', t => {
+    const rt = new Runtime();
+    rt.addTarget({
+        id: 'target1',
+        isStage: true,
+        blocks: new Blocks(rt, true),
+        variables: {},
+        comments: {}
+    });
+    const b = new Blocks(rt);
+    b.createBlock({
+        id: 'foo',
+        opcode: 'control_if',
+        next: null,
+        parent: null,
+        inputs: {},
+        fields: {},
+        shadow: false,
+        topLevel: true,
+        x: 0,
+        y: 0
+    });
+
+    b.blocklyListen({
+        type: 'block_input_collapse',
+        blockId: 'foo',
+        inputName: 'SUBSTACK',
+        newCollapsed: true
+    });
+
+    t.same(b.getBlock('foo').collapsedInputs, ['SUBSTACK'], 'collapsed input is stored');
+    t.match(b.toXML(), /collapsedinputs="SUBSTACK"/, 'collapsed input is serialized to XML');
+
+    b.blocklyListen({
+        type: 'block_input_collapse',
+        blockId: 'foo',
+        inputName: 'SUBSTACK',
+        newCollapsed: false
+    });
+
+    t.same(b.getBlock('foo').collapsedInputs, [], 'expanded input is removed');
+    t.notMatch(b.toXML(), /collapsedinputs/, 'expanded input is not serialized');
+
+    t.end();
+});
+
 test('delete', t => {
     const b = new Blocks(new Runtime());
     b.createBlock({

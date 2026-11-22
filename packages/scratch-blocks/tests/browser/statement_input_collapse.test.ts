@@ -7,9 +7,11 @@
 // unfolds it has to stay visible on the row above the input.
 import * as Blockly from 'blockly/core'
 import { afterAll, afterEach, assert, beforeAll, describe, expect, it } from 'vitest'
+import { BlockInputCollapse } from '../../src/events/events_block_input_collapse'
 import { CollapsibleStatementInput } from '../../src/inputs/statement_input'
 import '../../src/renderer/renderer'
 import { ScratchMsgs } from '../../src/scratch_msgs'
+import { clearWorkspaceAndLoadFromXml } from '../../src/xml'
 
 const BLOCK_TYPES = ['test_collapsible_statement', 'test_collapsible_child']
 
@@ -131,5 +133,49 @@ describe('collapsible statement input', () => {
     expect(input.toggleField.isVisible()).toBe(true)
     expect(input.toggleField.getValue()).toContain('collapse.svg')
     expect(child.getSvgRoot().style.display).toBe('block')
+  })
+
+  it('fires an event naming the input when it is collapsed', async () => {
+    const block = makeBlock('test_collapsible_statement')
+    const events: BlockInputCollapse[] = []
+    const listener = (event: Blockly.Events.Abstract) => {
+      // Other tests leave queued events behind; only follow this block.
+      if (event instanceof BlockInputCollapse && event.blockId === block.id) events.push(event)
+    }
+    workspace.addChangeListener(listener)
+
+    try {
+      bodyInput(block).toggleField.showEditor()
+      // Blockly dispatches queued events after the next animation frame.
+      await new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))
+    } finally {
+      workspace.removeChangeListener(listener)
+    }
+
+    expect(events).toHaveLength(1)
+    expect(events[0].blockId).toBe(block.id)
+    expect(events[0].inputName).toBe('BODY')
+    expect(events[0].newCollapsed).toBe(true)
+  })
+
+  it('restores collapsed inputs when loading workspace XML', () => {
+    clearWorkspaceAndLoadFromXml(
+      Blockly.utils.xml.textToDom(`
+        <xml>
+          <block type="test_collapsible_statement" id="statement" x="0" y="0" collapsedinputs="BODY">
+            <statement name="BODY">
+              <block type="test_collapsible_child" id="child"></block>
+            </statement>
+          </block>
+        </xml>
+      `),
+      workspace,
+    )
+
+    const block = workspace.getBlockById('statement')
+    assert(block, 'the statement block should load')
+    const input = bodyInput(block)
+    expect(input.isCollapsed()).toBe(true)
+    expect(block.getInputTargetBlock('BODY')).not.toBeNull()
   })
 })

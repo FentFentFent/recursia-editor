@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the event blocks.
  *
@@ -14,16 +16,21 @@ module.exports = {
 			const broadcastVar = emit.newVarName('broadcast');
 
 			return {
-				lines: [
-					...option.lines,
-					'{',
-					`\tconst ${broadcastVar} = runtime.getTargetForStage().lookupBroadcastMsg(
-						${option.source}.id, ${option.source}.name
-					);`.replace(/\n\t*/g, ' '),
-					`\tif (${broadcastVar}) {`,
-					`\t\truntime.startHats('event_whenbroadcastreceived', {BROADCAST_OPTION: ${broadcastVar}.name});`,
-					'\t}',
-					'}'
+				statements: [
+					...option.statements,
+					ir.block([
+						ir.declaration('const', broadcastVar, ir.source([
+							'runtime.getTargetForStage().lookupBroadcastMsg(',
+							option.source, '.id, ', option.source, '.name)'
+						])),
+						ir.ifThen(ir.source([broadcastVar]), [
+							ir.statement(
+								"runtime.startHats('event_whenbroadcastreceived', " +
+								'{BROADCAST_OPTION: ',
+								broadcastVar, '.name})'
+							)
+						])
+					])
 				]
 			};
 		},

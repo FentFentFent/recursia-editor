@@ -179,6 +179,11 @@ ShaderManager.DRAW_MODE = {
     line: 'line',
 
     /**
+     * Draw many lines with caps at once, taking each line's values from its vertex attributes.
+     */
+    lineBatch: 'lineBatch',
+
+    /**
      * Draw the background in a certain color. Must sometimes be used instead of gl.clear.
      */
     background: 'background'

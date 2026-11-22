@@ -4,6 +4,7 @@ const uuid = require('uuid');
 
 const ArgumentType = require('../extension-support/argument-type');
 const Blocks = require('./blocks');
+const BlockUtility = require('./block-utility');
 const Compiler = require('../compiler/compiler');
 const BlocksRuntimeCache = require('./blocks-runtime-cache');
 const BlockType = require('../extension-support/block-type');
@@ -24,6 +25,7 @@ const fetchWithTimeout = require('../util/fetch-with-timeout');
 // Virtual I/O devices.
 const Clock = require('../io/clock');
 const Cloud = require('../io/cloud');
+const Gamepad = require('../io/gamepad');
 const Keyboard = require('../io/keyboard');
 const Mouse = require('../io/mouse');
 const MouseWheel = require('../io/mouseWheel');
@@ -387,6 +389,7 @@ class Runtime extends EventEmitter {
         this.ioDevices = {
             clock: new Clock(this),
             cloud: new Cloud(this),
+            gamepad: new Gamepad(this),
             keyboard: new Keyboard(this),
             mouse: new Mouse(this),
             mouseWheel: new MouseWheel(this),
@@ -918,6 +921,10 @@ class Runtime extends EventEmitter {
             categoryInfo.color3 = defaultExtensionColors[2];
         }
 
+        if (extensionInfo.colorStyle) {
+            categoryInfo.colorStyle = extensionInfo.colorStyle;
+        }
+
         this._blockInfo.push(categoryInfo);
 
         this._fillExtensionCategory(categoryInfo, extensionInfo);
@@ -1172,7 +1179,9 @@ class Runtime extends EventEmitter {
             type: extendedOpcode,
             inputsInline: true,
             category: categoryInfo.name,
-            style: categoryInfo.id,
+            // Blocks with their own colorStyle get a distinct block style, whose colors the host
+            // resolves for the active color mode.
+            style: blockInfo.colorStyle ? `${extendedOpcode}_style` : categoryInfo.id,
             extensions: []
         };
         const context = {
@@ -1235,6 +1244,12 @@ class Runtime extends EventEmitter {
             blockJSON.outputShape = ScratchBlocksConstants.OUTPUT_SHAPE_SQUARE;
             blockJSON.nextStatement = null; // null = available connection; undefined = terminal
             blockJSON.extensions.push('shape_hat');
+            break;
+        case BlockType.META:
+            // Meta blocks describe project metadata rather than a step in a script: they get no previous
+            // or next connection, so they sit on the workspace on their own, and the runtime reads them
+            // when the project starts. Branches hold the metadata itself, such as a class's members.
+            blockInfo.branchCount = blockInfo.branchCount || 0;
             break;
         case BlockType.CONDITIONAL:
         case BlockType.LOOP:
@@ -1544,7 +1559,7 @@ class Runtime extends EventEmitter {
         if (argInfo.type == ArgumentType.SINGLE_BLOCK) {
             argJSON = {
 
-                type: 'input_statement_single',
+                type: 'input_block_single',
                 name: placeholder
             }
         } else if (argInfo.type == ArgumentType.INLINE_STACK) {
@@ -1567,10 +1582,11 @@ class Runtime extends EventEmitter {
      * @param {?Target} [target] - the active editing target (optional)
      * @property {string} id - the category / extension ID
      * @property {string} xml - the XML text for this category, starting with `<category>` and ending with `</category>`
+     * @property {ColorStyle} [colorStyle] - the category's color style, if it declared one
      */
     getBlocksXML (target) {
         return this._blockInfo.map(categoryInfo => {
-            const {name, color1, color2} = categoryInfo;
+            const {name, color1, color2, colorStyle} = categoryInfo;
             // Filter out blocks that aren't supposed to be shown on this target, as determined by the block info's
             // `hideFromPalette` and `filter` properties.
             const paletteBlocks = categoryInfo.blocks.filter(block => {
@@ -1607,7 +1623,8 @@ class Runtime extends EventEmitter {
             return {
                 id: categoryInfo.id,
                 xml: `<category name="${name}" toolboxitemid="${categoryInfo.id}" ${statusButtonXML} ${colorXML} ${
-                    menuIconXML}>${paletteBlocks.map(block => block.xml).join('')}</category>`
+                    menuIconXML}>${paletteBlocks.map(block => block.xml).join('')}</category>`,
+                colorStyle
             };
         });
     }
@@ -1618,6 +1635,125 @@ class Runtime extends EventEmitter {
     getBlocksJSON () {
         return this._blockInfo.reduce(
             (result, categoryInfo) => result.concat(categoryInfo.blocks.map(blockInfo => blockInfo.json)), []);
+    }
+
+    /**
+     * @typedef {object} MetaBlockInfo - a meta block found in the project
+     * @property {Target} target - the target holding the meta block
+     * @property {object} block - the block's record in the target's block container
+     * @property {object} blockInfo - the extension's metadata for the block's opcode
+     */
+
+    /**
+     * Find every meta block in the project. A meta block is a top-level block which an extension
+     * declared with `blockType: BlockType.META`: it has no previous or next connection and describes
+     * project metadata, like a class definition, instead of a step which a script runs.
+     * @returns {Array.<MetaBlockInfo>} the meta blocks, in target order.
+     */
+    getMetaBlocks () {
+        const metaBlockInfoByOpcode = new Map();
+        for (const categoryInfo of this._blockInfo) {
+            for (const convertedBlock of categoryInfo.blocks) {
+                if (convertedBlock.json && convertedBlock.info.blockType === BlockType.META) {
+                    metaBlockInfoByOpcode.set(convertedBlock.json.type, convertedBlock.info);
+                }
+            }
+        }
+
+        const metaBlocks = [];
+        if (metaBlockInfoByOpcode.size === 0) return metaBlocks;
+
+        // Clones share the blocks of the sprite they came from: scan each block container once so a
+        // meta block runs once no matter how many clones of its sprite exist.
+        const scannedBlockContainers = new Set();
+        for (const target of this.targets) {
+            if (scannedBlockContainers.has(target.blocks)) continue;
+            scannedBlockContainers.add(target.blocks);
+            for (const blockId of target.blocks.getScripts()) {
+                const block = target.blocks.getBlock(blockId);
+                const blockInfo = block && metaBlockInfoByOpcode.get(block.opcode);
+                if (blockInfo) {
+                    metaBlocks.push({target, block, blockInfo});
+                }
+            }
+        }
+        return metaBlocks;
+    }
+
+    /**
+     * Run every meta block in the project. The runtime does this when a project starts, which lets an
+     * extension build the metadata its meta blocks describe before any script runs: the Collections
+     * extension, for example, creates every class the project declares. Call this again to rebuild that
+     * metadata after the meta blocks change.
+     * @returns {Array.<*>} the value each meta block's implementation returned.
+     */
+    runMetaBlocks () {
+        const results = [];
+        for (const {target, block, blockInfo} of this.getMetaBlocks()) {
+            try {
+                const thread = new Thread(block.id);
+                thread.target = target;
+                thread.pushStack(block.id);
+                const util = new BlockUtility(this.sequencer, thread);
+                results.push(blockInfo.func(this._getMetaBlockArguments(target, block, blockInfo), util));
+            } catch (e) {
+                log.error(`Error running meta block ${block.opcode}:`, e);
+            }
+        }
+        return results;
+    }
+
+    /**
+     * Build the arguments for a meta block from its inputs and fields. Meta blocks run outside a
+     * script, so only the literal blocks which fill its inputs can be read: a reporter dropped into an
+     * input is not evaluated. Fields always provide their values.
+     * @param {Target} target - the target holding the meta block
+     * @param {object} block - the block's record
+     * @param {object} blockInfo - the extension's metadata for the block
+     * @returns {object} the arguments, keyed by placeholder name
+     * @private
+     */
+    _getMetaBlockArguments (target, block, blockInfo) {
+        const args = {};
+        const argumentInfos = blockInfo.arguments || {};
+        for (const argumentName in argumentInfos) {
+            const input = block.inputs[argumentName];
+            const inputBlock = input && input.block ? target.blocks.getBlock(input.block) : null;
+            if (inputBlock) {
+                args[argumentName] = this._getMetaBlockInputValue(inputBlock);
+            } else {
+                const defaultValue = argumentInfos[argumentName].defaultValue;
+                args[argumentName] = defaultValue === undefined ? '' : defaultValue;
+            }
+        }
+        for (const fieldName in block.fields) {
+            args[fieldName] = block.fields[fieldName].value;
+        }
+        return args;
+    }
+
+    /**
+     * Read the value of a literal block sitting in a meta block's input.
+     * @param {object} inputBlock - the block in the input
+     * @returns {*} its value, or an empty string for anything else, such as a reporter
+     * @private
+     */
+    _getMetaBlockInputValue (inputBlock) {
+        const fields = inputBlock.fields || {};
+        switch (inputBlock.opcode) {
+        case 'text':
+            return fields.TEXT ? fields.TEXT.value : '';
+        case 'math_number':
+        case 'math_positive_number':
+        case 'math_whole_number':
+        case 'math_integer':
+        case 'math_angle':
+            return fields.NUM ? Number(fields.NUM.value) : 0;
+        case 'colour_picker':
+            return fields.COLOUR ? fields.COLOUR.value : '';
+        default:
+            return '';
+        }
     }
 
     /**
@@ -1900,9 +2036,10 @@ class Runtime extends EventEmitter {
             this.monitorBlocks :
             target.blocks;
 
-        thread.pushStack(id);
-        // Running a procedure definition directly starts one function scope.
-        const topBlock = thread.blockContainer.getBlock(id);
+        		thread.pushStack(id);
+		// Running a procedure definition directly starts one function scope.
+		// A target without blocks can still start a thread, as some callers do.
+		const topBlock = thread.blockContainer && thread.blockContainer.getBlock(id);
         if (topBlock && topBlock.opcode === 'procedures_definition') {
             thread.startFunctionScope();
         }
@@ -2294,6 +2431,8 @@ class Runtime extends EventEmitter {
         this.stopAll();
         this.emit(Runtime.PROJECT_START);
         this.ioDevices.clock.resetProjectTimer();
+        // Build the project's metadata, such as the classes it declares, before any script runs.
+        this.runMetaBlocks();
         this.targets.forEach(target => target.clearEdgeActivatedValues());
         // Inform all targets of the green flag.
         for (let i = 0; i < this.targets.length; i++) {

@@ -2,8 +2,9 @@
  * Copyright 2023 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
-import { registerContinuousToolbox,ContinuousMetrics } from '@blockly/continuous-toolbox'
+import { registerContinuousToolbox, ContinuousMetrics } from '@blockly/continuous-toolbox'
 import * as Blockly from 'blockly/core'
+import { installBlockCulling } from './block_culling'
 import './blocks/colour'
 import './blocks/control'
 import './blocks/data'
@@ -11,6 +12,7 @@ import './blocks/event'
 import './blocks/looks'
 import './blocks/math'
 import './blocks/matrix'
+import './blocks/modules'
 import './blocks/motion'
 import './blocks/note'
 import './blocks/operators'
@@ -18,7 +20,6 @@ import './blocks/procedures'
 import './blocks/sensing'
 import './blocks/sound'
 import './blocks/text'
-import './blocks/modules';
 import './blocks/vertical_extensions'
 import { CheckableContinuousFlyout } from './checkable_continuous_flyout'
 import { ScratchBlocksTheme } from './constants'
@@ -30,10 +31,11 @@ import './events/events_block_comment_create'
 import './events/events_block_comment_delete'
 import './events/events_block_comment_move'
 import './events/events_block_comment_resize'
+import './events/events_block_input_collapse'
 import './events/events_scratch_variable_create'
-import { registerFieldColourSlider,FieldColourSlider } from './fields/field_colour_slider'
+import { registerFieldColourSlider, FieldColourSlider } from './fields/field_colour_slider'
 import { registerFieldMatrix } from './fields/field_matrix'
-import { registerFieldNote,FieldNote } from './fields/field_note'
+import { registerFieldNote, FieldNote } from './fields/field_note'
 import { registerFieldTextInputRemovable } from './fields/field_textinput_removable'
 import { registerFieldVariableGetter } from './fields/field_variable_getter'
 import { registerFieldVerticalSeparator } from './fields/field_vertical_separator'
@@ -42,10 +44,11 @@ import { registerScratchFieldDropdown } from './fields/scratch_field_dropdown'
 import { registerScratchFieldNumber } from './fields/scratch_field_number'
 import { registerScratchFieldVariable } from './fields/scratch_field_variable'
 import './flyout_checkbox_icon'
-import { buildGlowFilter,glowStack } from './glows'
-import './inputs/statement_input'
-import { SingleStatementInput } from './inputs/single_statement_input'
+import { buildGlowFilter, glowStack } from './glows'
 import InlineStatementInput from './inputs/inline_statement_input'
+import { SingleBlockInput } from './inputs/single_block_input'
+import { SingleStatementInput } from './inputs/single_statement_input'
+import './inputs/statement_input'
 import { registerRecyclableBlockFlyoutInflater } from './recyclable_block_flyout_inflater'
 import './renderer/cat/renderer'
 import './renderer/renderer'
@@ -64,7 +67,6 @@ import { ScratchZoomControls } from './scratch_zoom_controls'
 import { registerStatusIndicatorLabelFlyoutInflater } from './status_indicator_label_flyout_inflater'
 import * as ScratchVariables from './variables'
 
-
 export * from './inputs/inline_statement_input'
 export * from 'blockly/core'
 export * from './block_reporting'
@@ -74,83 +76,83 @@ export * from './constants'
 export { glowStack }
 export { scratchBlocksUtils }
 export { InlineStatementInput }
-export {
-    SingleStatementInput
-}
+export { SingleBlockInput }
+export { SingleStatementInput }
 export { CheckableContinuousFlyout }
 export { ScratchVariables }
 export { contextMenuItems }
-export { FieldColourSlider,FieldNote }
+export { FieldColourSlider, FieldNote }
 export { CheckboxBubble } from './checkbox_bubble'
 export { ScratchZoomControls } from './scratch_zoom_controls'
-export { StatusIndicatorLabel,StatusButtonState } from './status_indicator_label'
+export { StatusIndicatorLabel, StatusButtonState } from './status_indicator_label'
 export * from './xml'
 
 interface ScratchBlocksOptions extends Blockly.BlocklyOptions {
-    /**
-     * Scratch uses "theme" to talk about the shape of blocks. The Blockly concept of a theme affects CSS properties and
-     * aligns more closely with "color mode" in Scratch.
-     */
-    scratchTheme?: ScratchBlocksTheme
+  /**
+   * Scratch uses "theme" to talk about the shape of blocks. The Blockly concept of a theme affects CSS properties and
+   * aligns more closely with "color mode" in Scratch.
+   */
+  scratchTheme?: ScratchBlocksTheme
 }
 
 function sanitizeTheme(theme?: ScratchBlocksTheme) {
-    if (theme === ScratchBlocksTheme.CAT_BLOCKS) {
-        return theme
-    }
-    return ScratchBlocksTheme.CLASSIC
+  if (theme === ScratchBlocksTheme.CAT_BLOCKS) {
+    return theme
+  }
+  return ScratchBlocksTheme.CLASSIC
 }
 
-export function inject(container: Element,options: ScratchBlocksOptions) {
-    registerScratchFieldAngle()
-    registerFieldColourSlider()
-    registerScratchFieldDropdown()
-    registerFieldMatrix()
-    registerFieldNote()
-    registerScratchFieldNumber()
-    registerFieldTextInputRemovable()
-    registerFieldVariableGetter()
-    registerScratchFieldVariable()
-    registerFieldVerticalSeparator()
-    registerRecyclableBlockFlyoutInflater()
-    registerScratchBlockPaster()
-    registerStatusIndicatorLabelFlyoutInflater()
-    registerScratchContinuousCategory()
+export function inject(container: Element, options: ScratchBlocksOptions) {
+  registerScratchFieldAngle()
+  registerFieldColourSlider()
+  registerScratchFieldDropdown()
+  registerFieldMatrix()
+  registerFieldNote()
+  registerScratchFieldNumber()
+  registerFieldTextInputRemovable()
+  registerFieldVariableGetter()
+  registerScratchFieldVariable()
+  registerFieldVerticalSeparator()
+  registerRecyclableBlockFlyoutInflater()
+  registerScratchBlockPaster()
+  registerStatusIndicatorLabelFlyoutInflater()
+  registerScratchContinuousCategory()
 
-    const scratchTheme = sanitizeTheme(options.scratchTheme)
+  const scratchTheme = sanitizeTheme(options.scratchTheme)
 
-    Object.assign(options,{
-        renderer: `scratch_${ scratchTheme }`,
-        plugins: {
-            toolbox: ScratchContinuousToolbox,
-            flyoutsVerticalToolbox: CheckableContinuousFlyout,
-            metricsManager: ContinuousMetrics,
-        },
-    })
-    const workspace = Blockly.inject(container,options)
+  Object.assign(options, {
+    renderer: `scratch_${scratchTheme}`,
+    plugins: {
+      toolbox: ScratchContinuousToolbox,
+      flyoutsVerticalToolbox: CheckableContinuousFlyout,
+      metricsManager: ContinuousMetrics,
+    },
+  })
+  const workspace = Blockly.inject(container, options)
 
-    buildGlowFilter(workspace)
+  buildGlowFilter(workspace)
+  installBlockCulling(workspace)
 
-    // Replace Blockly's sprite-sheet zoom controls with SVG-file-based ones so
-    // each button is a separate file and the correct set is picked up via
-    // pathToMedia (which varies by Scratch color mode).
-    const originalZoomControls = workspace.zoomControls_
-    if (originalZoomControls) {
-        originalZoomControls.dispose()
+  // Replace Blockly's sprite-sheet zoom controls with SVG-file-based ones so
+  // each button is a separate file and the correct set is picked up via
+  // pathToMedia (which varies by Scratch color mode).
+  const originalZoomControls = workspace.zoomControls_
+  if (originalZoomControls) {
+    originalZoomControls.dispose()
 
-        const scratchZoomControls = new ScratchZoomControls(workspace)
-        const zoomControlsSvg = scratchZoomControls.createDom()
-        workspace.svgGroup_.appendChild(zoomControlsSvg)
-        scratchZoomControls.init()
-    }
+    const scratchZoomControls = new ScratchZoomControls(workspace)
+    const zoomControlsSvg = scratchZoomControls.createDom()
+    workspace.svgGroup_.appendChild(zoomControlsSvg)
+    scratchZoomControls.init()
+  }
 
-    Blockly.config.dragRadius = 3
-    Blockly.config.snapRadius = 48
-    Blockly.config.connectingSnapRadius = 68
-    Blockly.config.currentConnectionPreference = 20
-    Blockly.config.bumpDelay = 0
+  Blockly.config.dragRadius = 3
+  Blockly.config.snapRadius = 48
+  Blockly.config.connectingSnapRadius = 68
+  Blockly.config.currentConnectionPreference = 20
+  Blockly.config.bumpDelay = 0
 
-    return workspace
+  return workspace
 }
 
 /**
@@ -166,7 +168,7 @@ export function inject(container: Element,options: ScratchBlocksOptions) {
  * @returns True if a content node has focus, false otherwise.
  */
 export function isContentNodeFocused(): boolean {
-    return Blockly.getFocusManager().getFocusedNode() !== null
+  return Blockly.getFocusManager().getFocusedNode() !== null
 }
 
 registerContinuousToolbox()
@@ -181,21 +183,21 @@ Blockly.ContextMenuItems.registerCommentOptions()
 // remove that restriction by dropping the isFullBlockField check.
 const blockCommentMenuItem = Blockly.ContextMenuRegistry.registry.getItem('blockComment')
 if (!blockCommentMenuItem) {
-    console.error('[index] Missing context menu item: blockComment')
+  console.error('[index] Missing context menu item: blockComment')
 } else {
-    blockCommentMenuItem.preconditionFn = (scope) => {
-        const block = scope.block
-        if (
-            block &&
-            !block.isInFlyout &&
-            block.workspace.options.comments &&
-            !block.isCollapsed() &&
-            block.isEditable()
-        ) {
-            return 'enabled'
-        }
-        return 'hidden'
+  blockCommentMenuItem.preconditionFn = (scope) => {
+    const block = scope.block
+    if (
+      block &&
+      !block.isInFlyout &&
+      block.workspace.options.comments &&
+      !block.isCollapsed() &&
+      block.isEditable()
+    ) {
+      return 'enabled'
     }
+    return 'hidden'
+  }
 }
 Blockly.ContextMenuRegistry.registry.unregister('blockDelete')
 contextMenuItems.registerDeleteBlock()
@@ -204,7 +206,7 @@ contextMenuItems.registerCopyShortcut()
 contextMenuItems.registerCutShortcut()
 Blockly.ContextMenuRegistry.registry.unregister('workspaceDelete')
 contextMenuItems.registerDeleteAll()
-Blockly.comments.CommentView.defaultCommentSize = new Blockly.utils.Size(200,200)
+Blockly.comments.CommentView.defaultCommentSize = new Blockly.utils.Size(200, 200)
 
 // When the focused block is deleted and has no parent or nearby neighbor,
 // Blockly falls back to focusing the first/topmost block in the workspace,
@@ -215,6 +217,6 @@ Blockly.comments.CommentView.defaultCommentSize = new Blockly.utils.Size(200,200
 // eslint-disable-next-line @typescript-eslint/unbound-method -- preserve original prototype method for patched wrapper
 const originalGetRestoredFocusableNode = Blockly.WorkspaceSvg.prototype.getRestoredFocusableNode
 Blockly.WorkspaceSvg.prototype.getRestoredFocusableNode = function (previousNode) {
-    if (!previousNode && !this.isFlyout) return null
-    return originalGetRestoredFocusableNode.call(this,previousNode)
+  if (!previousNode && !this.isFlyout) return null
+  return originalGetRestoredFocusableNode.call(this, previousNode)
 }

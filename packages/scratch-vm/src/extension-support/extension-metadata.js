@@ -6,7 +6,8 @@
  * @property {string} [blockIconURI] - URI for an image to be placed on each block in this extension. Data URI ok.
  * @property {string} [menuIconURI] - URI for an image to be placed on this extension's category menu item. Data URI ok.
  * @property {string} [docsURI] - link to documentation content for this extension.
- * @property {ColorStyle} [colorStyle] - colors for this extension's category and blocks in each color mode.
+ * @property {ColorStyle|string} [colorStyle] - colors for this extension's category and blocks in each color mode,
+ * or the name of a color style from color_styles.js.
  * @property {Array.<ExtensionBlockMetadata|string>} blocks - the blocks provided by this extension, plus separators.
  * @property {Object.<ExtensionMenuMetadata>} [menus] - map of menu name to metadata for each of this extension's menus.
  */
@@ -16,7 +17,9 @@
  * All the metadata needed to register an extension block.
  * @property {string} [opcode] - a unique alphanumeric identifier for this block. No special characters allowed.
  * @property {string} [func] - the name of the function implementing this block. Can be shared by other blocks/opcodes.
- * @property {BlockType} blockType - the type of block (command, reporter, label, etc.) being described.
+ * @property {BlockType} blockType - the type of block (command, reporter, label, etc.) being described. A
+ * META block has no previous or next connection: it describes project metadata, and the runtime runs every
+ * meta block in the project when the project starts.
  * @property {string} [text] - the text on the block, with [PLACEHOLDERS] for arguments. For a LABEL entry, the
  * @property {'any'|'string'|'number'|'boolean'|undefined} [returnType] - The optional return type of a BlockType.REPORTER block, left undefined will give 'string' by default.
  * text displayed on the label.
@@ -30,7 +33,8 @@
  * @property {int} [branchCount] - for flow control blocks, the number of branches/substacks for this block.
  * @property {Object.<ExtensionArgumentMetadata>} [arguments] - map of argument placeholder to metadata about each arg.
  * @property {StyleType|Array.<StyleType>} [style] - Visual styles applied to the block, if any.
- * @property {ColorStyle} [colorStyle] - overrides the extension's color style for this block, if any.
+ * @property {ColorStyle|string} [colorStyle] - overrides the extension's color style for this block, if any.
+ * May be the name of a color style from color_styles.js.
  * @property {ExtensionCompileFunction} [compile] - compiles this block to JavaScript instead of running it through
  * the interpreter. Only unsandboxed extensions can provide it: a function cannot cross the worker boundary.
  */

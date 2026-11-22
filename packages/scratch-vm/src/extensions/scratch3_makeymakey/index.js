@@ -170,6 +170,7 @@ class Scratch3MakeyMakeyBlocks {
     getInfo () {
         return {
             id: 'makeymakey',
+            colorStyle: 'makeymakey',
             name: 'Makey Makey',
             blockIconURI: blockIconURI,
             blocks: [

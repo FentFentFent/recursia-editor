@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the control blocks.
  *
@@ -11,20 +13,24 @@
  * @param {ScriptEmitter} emit Compiler emitting the block.
  * @param {object} block Loop block.
  * @param {boolean} whileTrue Whether the body runs while the condition is true.
- * @returns {{lines: Array.<string>}} Loop source.
+ * @returns {{statements: Array.<object>}} Loop source.
  */
 const conditionalLoop = (emit, block, whileTrue) => {
 	const condition = emit.input(block, 'CONDITION');
 	const body = emit.stack(emit.branch(block, 'SUBSTACK'));
-	const test = `Cast.toBoolean(${condition.source})`;
-	const check = whileTrue ? `if (!${test}) break;` : `if (${test}) break;`;
+	const test = emit.boolean(condition.source);
+	const check = whileTrue
+		? ir.ifThen(ir.source(['!', test]), [ir.statement('break')])
+		: ir.ifThen(test, [ir.statement('break')]);
+
 	return {
-		lines: [
-			'while (true) {',
-			...emit.indent([...condition.lines, check], 1),
-			...emit.indent(body.lines, 1),
-			...emit.indent(emit.loopYield(), 1),
-			'}'
+		statements: [
+			ir.whileLoop(ir.literal(true), [
+				...condition.statements,
+				check,
+				...body,
+				...emit.loopYield()
+			])
 		]
 	};
 };
@@ -33,11 +39,12 @@ const ifBlock = (emit, block) => {
 	const condition = emit.input(block, 'CONDITION');
 
 	return {
-		lines: [
-			...condition.lines,
-			`if (Cast.toBoolean(${condition.source})) {`,
-			...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK')).lines, 1),
-			'}'
+		statements: [
+			...condition.statements,
+			ir.ifThen(
+				ir.source(['Cast.toBoolean(', condition.source, ')']),
+				emit.stack(emit.branch(block, 'SUBSTACK'))
+			)
 		]
 	};
 };
@@ -46,13 +53,13 @@ const ifElse = (emit, block) => {
 	const condition = emit.input(block, 'CONDITION');
 
 	return {
-		lines: [
-			...condition.lines,
-			`if (Cast.toBoolean(${condition.source})) {`,
-			...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK')).lines, 1),
-			'} else {',
-			...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK2')).lines, 1),
-			'}'
+		statements: [
+			...condition.statements,
+			ir.ifThen(
+				emit.boolean(condition.source),
+				emit.stack(emit.branch(block, 'SUBSTACK')),
+				emit.stack(emit.branch(block, 'SUBSTACK2'))
+			)
 		]
 	};
 };
@@ -63,15 +70,19 @@ const repeat = (emit, block) => {
 	const index = emit.newVarName('index');
 
 	return {
-		lines: [
-			...times.lines,
-			'{',
-			`\tconst ${count} = Math.round(Cast.toNumber(${times.source}));`,
-			`\tfor (let ${index} = 0; ${index} < ${count}; ${index}++) {`,
-			...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK')).lines, 2),
-			...emit.indent(emit.loopYield(), 2),
-			'\t}',
-			'}'
+		statements: [
+			...times.statements,
+			ir.block([
+				ir.declaration(
+					'const',
+					count,
+					ir.source(['Math.round(', emit.number(times.source), ')'])
+				),
+				ir.forLoop(`let ${index} = 0`, ir.source([index, ' < ', count]), `${index}++`, [
+					...emit.stack(emit.branch(block, 'SUBSTACK')),
+					...emit.loopYield()
+				])
+			])
 		]
 	};
 };
@@ -81,11 +92,11 @@ const repeatUntil = (emit, block) => conditionalLoop(emit, block, false);
 const repeatWhile = (emit, block) => conditionalLoop(emit, block, true);
 
 const forever = (emit, block) => ({
-	lines: [
-		'while (true) {',
-		...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK')).lines, 1),
-		...emit.indent(emit.loopYield(), 1),
-		'}'
+	statements: [
+		ir.whileLoop(ir.literal(true), [
+			...emit.stack(emit.branch(block, 'SUBSTACK')),
+			...emit.loopYield()
+		])
 	]
 });
 
@@ -93,11 +104,15 @@ const waitUntil = (emit, block) => {
 	const condition = emit.input(block, 'CONDITION');
 
 	return {
-		lines: [
-			'while (true) {',
-			...emit.indent([...condition.lines, `if (Cast.toBoolean(${condition.source})) break;`], 1),
-			'\tyield Signals.YIELD;',
-			'}'
+		statements: [
+			ir.whileLoop(ir.literal(true), [
+				...condition.statements,
+				ir.ifThen(
+					emit.boolean(condition.source),
+					[ir.statement('break')]
+				),
+				ir.yieldStatement(ir.source('Signals.YIELD'))
+			])
 		]
 	};
 };
@@ -107,19 +122,20 @@ const forEach = (emit, block) => {
 	const variable = emit.newVarName('variable');
 	const count = emit.newVarName('count');
 	const index = emit.newVarName('index');
+	const field = emit.variableField(block, 'VARIABLE');
 
 	return {
-		lines: [
-			...value.lines,
-			'{',
-			`\tconst ${variable} = ${emit.variable(block, 'VARIABLE')};`,
-			`\tconst ${count} = Number(${value.source});`,
-			`\tfor (let ${index} = 0; ${index} < ${count}; ${index}++) {`,
-			`\t\t${variable}.value = ${index} + 1;`,
-			...emit.indent(emit.stack(emit.branch(block, 'SUBSTACK')).lines, 2),
-			...emit.indent(emit.loopYield(), 2),
-			'\t}',
-			'}'
+		statements: [
+			...value.statements,
+			ir.block([
+				ir.declaration('const', variable, emit.variable(block, 'VARIABLE')),
+				ir.declaration('const', count, ir.source(['Number(', value.source, ')'])),
+				ir.forLoop(`let ${index} = 0`, ir.source([index, ' < ', count]), `${index}++`, [
+					ir.assignment(ir.source([variable, '.value']), ir.source([index, ' + 1']), field.id),
+					...emit.stack(emit.branch(block, 'SUBSTACK')),
+					...emit.loopYield()
+				])
+			])
 		]
 	};
 };
@@ -132,16 +148,23 @@ const wait = (emit, block) => {
 	const timer = emit.newVarName('timer');
 
 	return {
-		lines: [
-			...duration.lines,
-			'{',
-			`\tconst ${milliseconds} = Math.max(0, 1000 * Cast.toNumber(${duration.source}));`,
-			'\truntime.requestRedraw();',
-			`\tconst ${timer} = new Timer();`,
-			`\t${timer}.start();`,
-			'\tyield Signals.YIELD;',
-			`\twhile (${timer}.timeElapsed() < ${milliseconds}) yield Signals.YIELD;`,
-			'}'
+		statements: [
+			...duration.statements,
+			ir.block([
+				ir.declaration(
+					'const',
+					milliseconds,
+					ir.source(['Math.max(0, 1000 * ', emit.number(duration.source), ')'])
+				),
+				ir.statement('runtime.requestRedraw()'),
+				ir.declaration('const', timer, ir.source('new Timer()')),
+				ir.statement(timer, '.start()'),
+				ir.yieldStatement(ir.source('Signals.YIELD')),
+				ir.whileLoop(
+					ir.source([timer, '.timeElapsed() < ', milliseconds]),
+					[ir.yieldStatement(ir.source('Signals.YIELD'))]
+				)
+			])
 		]
 	};
 };
@@ -153,30 +176,33 @@ const createClone = (emit, block) => {
 	const newClone = emit.newVarName('newClone');
 
 	return {
-		lines: [
-			...option.lines,
-			'{',
-			`\tconst ${name} = Cast.toString(${option.source});`,
-			`\tconst ${cloneTarget} = ${name} === '_myself_' ? target : runtime.getSpriteTargetByName(${name});`,
-			`\tif (${cloneTarget}) {`,
-			`\t\tconst ${newClone} = ${cloneTarget}.makeClone();`,
-			`\t\tif (${newClone}) {`,
-			`\t\t\truntime.addTarget(${newClone});`,
-			`\t\t\t${newClone}.goBehindOther(${cloneTarget});`,
-			'\t\t}',
-			'\t}',
-			'}'
+		statements: [
+			...option.statements,
+			ir.block([
+				ir.declaration('const', name, ir.source(['Cast.toString(', option.source, ')'])),
+				ir.declaration('const', cloneTarget, ir.source([
+					name, " === '_myself_' ? target : runtime.getSpriteTargetByName(",
+					name, ')'
+				])),
+				ir.ifThen(ir.source([cloneTarget]), [
+					ir.declaration('const', newClone, ir.source([cloneTarget, '.makeClone()'])),
+					ir.ifThen(ir.source([newClone]), [
+						ir.statement('runtime.addTarget(', newClone, ')'),
+						ir.statement(newClone, '.goBehindOther(', cloneTarget, ')')
+					])
+				])
+			])
 		]
 	};
 };
 
 const deleteClone = () => ({
-	lines: [
-		'if (!target.isOriginal) {',
-		'\truntime.disposeTarget(target);',
-		'\truntime.stopForTarget(target);',
-		'\treturn;',
-		'}'
+	statements: [
+		ir.ifThen(ir.source('!target.isOriginal'), [
+			ir.statement('runtime.disposeTarget(target)'),
+			ir.statement('runtime.stopForTarget(target)'),
+			ir.returnStatement()
+		])
 	]
 });
 
@@ -184,15 +210,21 @@ const stop = (emit, block) => {
 	const option = emit.field(block, 'STOP_OPTION');
 
 	return {
-		lines: [
-			`if (${option} === 'all') {`,
-			'\truntime.stopAll();',
-			'\treturn;',
-			`} else if (${option} === 'other scripts in sprite' || ${option} === 'other scripts in stage') {`,
-			'\tutil.stopOtherTargetThreads();',
-			'} else {',
-			'\treturn;',
-			'}'
+		statements: [
+			ir.ifThen(
+				ir.source([option, " === 'all'"]),
+				[ir.statement('runtime.stopAll()'), ir.returnStatement()],
+				[
+					ir.ifThen(
+						ir.source([
+							option, " === 'other scripts in sprite' || ",
+							option, " === 'other scripts in stage'"
+						]),
+						[ir.statement('util.stopOtherTargetThreads()')],
+						[ir.returnStatement()]
+					)
+				]
+			)
 		]
 	};
 };
@@ -200,7 +232,7 @@ const stop = (emit, block) => {
 module.exports = {
 	expressions: {},
 	statements: {
-		control_all_at_once: (emit, block) => emit.stack(emit.branch(block, 'SUBSTACK')),
+		control_all_at_once: (emit, block) => ({statements: emit.stack(emit.branch(block, 'SUBSTACK'))}),
 		control_for_each: forEach,
 		control_forever: forever,
 		control_if: ifBlock,

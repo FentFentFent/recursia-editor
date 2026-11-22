@@ -5,7 +5,11 @@ import {
     getColorsForMode,
     HIGH_CONTRAST_MODE
 } from '../../../src/lib/settings/color-mode';
-import {injectExtensionBlockIcons, injectExtensionCategoryMode} from '../../../src/lib/settings/color-mode/blockHelpers';
+import {
+    getColorStyleColors,
+    injectExtensionBlockIcons,
+    injectExtensionCategoryMode
+} from '../../../src/lib/settings/color-mode/blockHelpers';
 import {detectColorMode, persistColorMode} from '../../../src/lib/settings/color-mode/persistence';
 
 jest.mock('../../../src/lib/settings/color-mode/default');
@@ -29,6 +33,33 @@ describe('color modes', () => {
             const colors = getColorsForMode(DARK_MODE);
 
             expect(colors.motion.colourSecondary).toEqual('#222222');
+        });
+    });
+
+    describe('color styles', () => {
+        test('extends a built-in color style in each color mode', () => {
+            const colors = getColorStyleColors({base: 'motion'}, DARK_MODE);
+
+            expect(colors.colourPrimary).toEqual('#AAAAAA');
+            expect(colors.colourTertiary).toEqual('#333333');
+        });
+
+        test('uses the colors declared for a specific color mode', () => {
+            const colors = getColorStyleColors({
+                base: 'motion',
+                [DARK_MODE]: {color1: '#010203', color2: '#040506'}
+            }, DARK_MODE);
+
+            expect(colors).toEqual({
+                colourPrimary: '#010203',
+                colourSecondary: '#040506',
+                colourTertiary: '#040506',
+                colourQuaternary: '#040506'
+            });
+        });
+
+        test('returns no colors for a color mode without an entry', () => {
+            expect(getColorStyleColors({[DARK_MODE]: 'motion'}, DEFAULT_MODE)).toBeNull();
         });
     });
 
@@ -93,6 +124,24 @@ describe('color modes', () => {
                     }
                 ]
             });
+        });
+
+        test('applies an extension color style to its category in the default mode', () => {
+            const dynamicBlockXML = [
+                {
+                    id: 'pen',
+                    colorStyle: {
+                        default: {color1: '#010203', color3: '#040506'}
+                    },
+                    xml: '<category name="Pen" id="pen" colour="#0FBD8C" secondaryColour="#0DA57A"></category>'
+                }
+            ];
+
+            injectExtensionCategoryMode(dynamicBlockXML, DEFAULT_MODE);
+
+            expect(serializeToString.mock.calls[0][0].documentElement.getAttribute('colour')).toBe('#010203');
+            expect(serializeToString.mock.calls[0][0].documentElement.getAttribute('secondaryColour'))
+                .toBe('#040506');
         });
 
         test('updates extension category based on color mode', () => {

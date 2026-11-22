@@ -1285,6 +1285,7 @@ class Scratch3BoostBlocks {
     getInfo () {
         return {
             id: Scratch3BoostBlocks.EXTENSION_ID,
+            colorStyle: 'boost',
             name: 'BOOST',
             blockIconURI: iconURI,
             showStatusButton: true,

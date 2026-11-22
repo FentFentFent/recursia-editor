@@ -924,6 +924,7 @@ class Scratch3WeDo2Blocks {
     getInfo () {
         return {
             id: Scratch3WeDo2Blocks.EXTENSION_ID,
+            colorStyle: 'wedo2',
             name: 'WeDo 2.0',
             blockIconURI: iconURI,
             showStatusButton: true,

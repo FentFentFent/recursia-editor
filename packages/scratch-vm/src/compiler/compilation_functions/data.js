@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the data blocks.
  *
@@ -8,36 +10,48 @@
 
 const setVariableTo = (emit, block) => {
 	const value = emit.input(block, 'VALUE');
-	const variable = emit.newVarName('variable');
+	const variable = emit.variableReference(block, 'VARIABLE');
+	const field = emit.variableField(block, 'VARIABLE');
 
 	return {
-		lines: [
-			...value.lines,
-			'{',
-			`\tconst ${variable} = ${emit.variable(block, 'VARIABLE')};`,
-			`\t${variable}.value = ${value.source};`,
-			`\tif (${variable}.isCloud) {`,
-			`\t\tutil.ioQuery('cloud', 'requestUpdateVariable', [${variable}.name, ${variable}.value]);`,
-			`\t}`,
-			'}'
+		statements: [
+			...value.statements,
+			ir.block([
+				ir.assignment(ir.source([variable, '.value']), value.source, field.id),
+				ir.ifThen(ir.source([variable, '.isCloud']), [
+					ir.statement(
+						"util.ioQuery('cloud', 'requestUpdateVariable', [",
+						variable, '.name, ', variable, '.value])'
+					)
+				])
+			])
 		]
 	};
 };
 
 const changeVariableBy = (emit, block) => {
 	const value = emit.input(block, 'VALUE');
-	const variable = emit.newVarName('variable');
+	const variable = emit.variableReference(block, 'VARIABLE');
+	const field = emit.variableField(block, 'VARIABLE');
 
 	return {
-		lines: [
-			...value.lines,
-			'{',
-			`\tconst ${variable} = ${emit.variable(block, 'VARIABLE')};`,
-			`\t${variable}.value = Cast.toNumber(${variable}.value) + Cast.toNumber(${value.source});`,
-			`\tif (${variable}.isCloud) {`,
-			`\t\tutil.ioQuery('cloud', 'requestUpdateVariable', [${variable}.name, ${variable}.value]);`,
-			`\t}`,
-			'}'
+		statements: [
+			...value.statements,
+			ir.block([
+				ir.assignment(
+					ir.source([variable, '.value']),
+					ir.source([
+						emit.number(emit.variableValue(block, 'VARIABLE')), ' + ', emit.number(value.source)
+					]),
+					field.id
+				),
+				ir.ifThen(ir.source([variable, '.isCloud']), [
+					ir.statement(
+						"util.ioQuery('cloud', 'requestUpdateVariable', [",
+						variable, '.name, ', variable, '.value])'
+					)
+				])
+			])
 		]
 	};
 };
@@ -45,8 +59,8 @@ const changeVariableBy = (emit, block) => {
 module.exports = {
 	expressions: {
 		data_variable: (emit, block) => ({
-			lines: [],
-			source: `${emit.variable(block, 'VARIABLE')}.value`
+			statements: [],
+			source: emit.variableValue(block, 'VARIABLE')
 		})
 	},
 	statements: {
@@ -54,16 +68,22 @@ module.exports = {
 		data_setvariableto: setVariableTo,
 
 		data_showvariable: (emit, block) => ({
-			lines: [
-				`runtime.monitorBlocks.changeBlock({id: ${JSON.stringify(block.fields.VARIABLE.id)}, ` +
-				"element: 'checkbox', value: true}, runtime);"
+			statements: [
+				ir.statement(
+					'runtime.monitorBlocks.changeBlock({id: ',
+					ir.literal(block.fields.VARIABLE.id),
+					", element: 'checkbox', value: true}, runtime)"
+				)
 			]
 		}),
 
 		data_hidevariable: (emit, block) => ({
-			lines: [
-				`runtime.monitorBlocks.changeBlock({id: ${JSON.stringify(block.fields.VARIABLE.id)}, ` +
-				"element: 'checkbox', value: false}, runtime);"
+			statements: [
+				ir.statement(
+					'runtime.monitorBlocks.changeBlock({id: ',
+					ir.literal(block.fields.VARIABLE.id),
+					", element: 'checkbox', value: false}, runtime)"
+				)
 			]
 		})
 	}

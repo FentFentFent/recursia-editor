@@ -255,6 +255,34 @@ test('serializeBlocks serializes x and y for topLevel blocks with x,y of 0,0', t
         });
 });
 
+test('serializeBlocks keeps collapsed statement inputs through a round trip', t => {
+    const blocks = {
+        collapsedBlock: {
+            id: 'collapsedBlock',
+            opcode: 'control_if',
+            next: null,
+            parent: null,
+            inputs: {},
+            fields: {},
+            shadow: false,
+            topLevel: true,
+            x: 0,
+            y: 0,
+            collapsedInputs: ['SUBSTACK']
+        }
+    };
+
+    const serialized = sb3.serializeBlocks(blocks)[0];
+    t.same(serialized.collapsedBlock.collapsedInputs, ['SUBSTACK'],
+        'collapsed inputs are serialized');
+
+    const deserialized = sb3.deserializeBlocks(JSON.parse(JSON.stringify(serialized)));
+    t.same(deserialized.collapsedBlock.collapsedInputs, ['SUBSTACK'],
+        'collapsed inputs survive deserialization');
+
+    t.end();
+});
+
 test('serializeBlock does not serialize shadow blocks as top-level', t => {
     const blocks = {
         hatBlock: {

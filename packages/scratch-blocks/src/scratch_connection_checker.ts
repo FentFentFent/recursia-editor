@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import * as Blockly from 'blockly/core'
+import { SingleBlockInput } from './inputs/single_block_input'
 import { SingleStatementInput } from './inputs/single_statement_input'
 
 /**
@@ -30,6 +31,16 @@ function isSingleStatementChildNextConnection(connection: Blockly.Connection | n
 }
 
 /**
+ * The single-block input a connection belongs to, if any.
+ * @param connection The connection to check.
+ * @returns The input, or null if the connection belongs to another kind of input.
+ */
+function getSingleBlockInput(connection: Blockly.Connection | null): SingleBlockInput | null {
+  const input = connection?.getParentInput()
+  return input instanceof SingleBlockInput ? input : null
+}
+
+/**
  * Custom connection checker to restrict which blocks can be connected.
  */
 class ScratchConnectionChecker extends Blockly.ConnectionChecker {
@@ -44,6 +55,25 @@ class ScratchConnectionChecker extends Blockly.ConnectionChecker {
       c?.type === Blockly.ConnectionType.NEXT_STATEMENT && c.getSourceBlock().type === 'procedures_prototype'
     if (isPrototypeNextConn(a) || isPrototypeNextConn(b)) {
       return Blockly.Connection.REASON_CHECKS_FAILED
+    }
+
+    // A single-block input also takes a reporter, which connects through its
+    // output connection. Blockly pairs each connection type with exactly one
+    // opposite type, so the slot is checked as though it were a value input
+    // while a reporter is offered to it.
+    const singleBlockInput = getSingleBlockInput(a) ?? getSingleBlockInput(b)
+    if (singleBlockInput) {
+      const otherConnection = singleBlockInput.connection === a ? b : a
+      if (otherConnection?.type === Blockly.ConnectionType.OUTPUT_VALUE) {
+        const connection = singleBlockInput.connection as { type: Blockly.ConnectionType }
+        const type = connection.type
+        connection.type = Blockly.ConnectionType.INPUT_VALUE
+        try {
+          return super.canConnectWithReason(a, b, isDragging, opt_distance)
+        } finally {
+          connection.type = type
+        }
+      }
     }
 
     // A single-statement input takes exactly one block. Reject anything that

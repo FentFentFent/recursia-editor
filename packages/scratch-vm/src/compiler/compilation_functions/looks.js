@@ -1,3 +1,5 @@
+const ir = require('../ir/index');
+
 /**
  * Compilation functions for the looks blocks.
  *
@@ -73,48 +75,63 @@ const clampEffect = emit => emit.helper('looks:clampEffect', 'clampEffect', `(ef
  * Emit a change of a graphic effect.
  * @param {ScriptEmitter} emit Compiler emitting the block.
  * @param {object} block The effect block.
- * @param {{lines: Array.<string>, source: string}} value Amount to change by.
- * @returns {{lines: Array.<string>}} Block source.
+ * @param {{statements: Array.<object>, source: object}} value Amount to change by.
+ * @returns {{statements: Array.<object>}} Block source.
  */
 const changeEffect = (emit, block, value) => {
 	const effect = emit.newVarName('effect');
 	const amount = emit.newVarName('value');
 
 	return {
-		lines: [
-			...value.lines,
-			'{',
-			`\tconst ${effect} = Cast.toString(${emit.field(block, 'EFFECT')}).toLowerCase();`,
-			`\tif (Object.prototype.hasOwnProperty.call(target.effects, ${effect})) {`,
-			`\t\tconst ${amount} = ${clampEffect(emit)}(${effect}, Cast.toNumber(${value.source}) + target.effects[${effect}]);`,
-			`\t\ttarget.setEffect(${effect}, ${amount});`,
-			`\t}`,
-			'}'
+		statements: [
+			...value.statements,
+			ir.block([
+				ir.declaration('const', effect, ir.source([
+					'Cast.toString(', emit.field(block, 'EFFECT'), ').toLowerCase()'
+				])),
+				ir.ifThen(
+					ir.source([
+						'Object.prototype.hasOwnProperty.call(target.effects, ', effect, ')'
+					]),
+					[
+						ir.declaration('const', amount, ir.source([
+							clampEffect(emit), '(', effect, ', Cast.toNumber(', value.source,
+							') + target.effects[', effect, '])'
+						])),
+						ir.statement('target.setEffect(', effect, ', ', amount, ')')
+					]
+				)
+			])
 		]
 	};
 };
 
 /**
  * Emit a change of the target's size.
- * @param {ScriptEmitter} emit Compiler emitting the block.
- * @param {{lines: Array.<string>, source: string}} size Size to set.
- * @returns {{lines: Array.<string>}} Block source.
+ * @param {{statements: Array.<object>, source: object}} size Size to set.
+ * @returns {{statements: Array.<object>}} Block source.
  */
-const setSize = (emit, size) => ({
-	lines: [...size.lines, `target.setSize(Cast.toNumber(${size.source}));`]
+const setSize = size => ({
+	statements: [
+		...size.statements,
+		ir.statement('target.setSize(Cast.toNumber(', size.source, '))')
+	]
 });
 
 module.exports = {
 	expressions: {
-		looks_size: () => ({lines: [], source: 'Math.round(target.size)'}),
+		looks_size: () => ({statements: [], source: ir.source('Math.round(target.size)')}),
 
 		looks_costumenumbername: (emit, block) => {
 			const name = emit.field(block, 'NUMBER_NAME');
 			const current = emit.newVarName('costume');
 
 			return {
-				lines: [`const ${current} = target.currentCostume;`],
-				source: `(${name} === 'number' ? ${current} + 1 : target.getCostumes()[${current}].name)`
+				statements: [ir.declaration('const', current, ir.source('target.currentCostume'))],
+				source: ir.source([
+					'(', name, " === 'number' ? ", current, ' + 1 : target.getCostumes()[',
+					current, '].name)'
+				])
 			};
 		},
 
@@ -124,11 +141,14 @@ module.exports = {
 			const current = emit.newVarName('backdrop');
 
 			return {
-				lines: [
-					`const ${stage} = runtime.getTargetForStage();`,
-					`const ${current} = ${stage}.currentCostume;`
+				statements: [
+					ir.declaration('const', stage, ir.source('runtime.getTargetForStage()')),
+					ir.declaration('const', current, ir.source([stage, '.currentCostume']))
 				],
-				source: `(${name} === 'number' ? ${current} + 1 : ${stage}.getCostumes()[${current}].name)`
+				source: ir.source([
+					'(', name, " === 'number' ? ", current, ' + 1 : ', stage,
+					'.getCostumes()[', current, '].name)'
+				])
 			};
 		}
 	},
@@ -136,34 +156,51 @@ module.exports = {
 		looks_say: (emit, block) => {
 			const message = emit.input(block, 'MESSAGE');
 
-			return {lines: [...message.lines, `runtime.emit('SAY', target, 'say', ${message.source});`]};
+			return {
+				statements: [
+					...message.statements,
+					ir.statement("runtime.emit('SAY', target, 'say', ", message.source, ')')
+				]
+			};
 		},
 
 		looks_think: (emit, block) => {
 			const message = emit.input(block, 'MESSAGE');
 
-			return {lines: [...message.lines, `runtime.emit('SAY', target, 'think', ${message.source});`]};
+			return {
+				statements: [
+					...message.statements,
+					ir.statement("runtime.emit('SAY', target, 'think', ", message.source, ')')
+				]
+			};
 		},
 
 		looks_switchcostumeto: (emit, block) => {
 			const costume = emit.input(block, 'COSTUME');
 
 			return {
-				lines: [...costume.lines, `${setCostume(emit)}(target, ${costume.source}, false);`]
+				statements: [
+					...costume.statements,
+					ir.statement(setCostume(emit), '(target, ', costume.source, ', false)')
+				]
 			};
 		},
 
 		looks_nextcostume: emit => ({
-			lines: [`${setCostume(emit)}(target, target.currentCostume + 1, true);`]
+			statements: [
+				ir.statement(setCostume(emit), '(target, target.currentCostume + 1, true)')
+			]
 		}),
 
 		looks_switchbackdropto: (emit, block) => {
 			const backdrop = emit.input(block, 'BACKDROP');
 
 			return {
-				lines: [
-					...backdrop.lines,
-					`${setBackdrop(emit)}(runtime.getTargetForStage(), ${backdrop.source}, false);`
+				statements: [
+					...backdrop.statements,
+					ir.statement(
+						setBackdrop(emit), '(runtime.getTargetForStage(), ', backdrop.source, ', false)'
+					)
 				]
 			};
 		},
@@ -172,9 +209,9 @@ module.exports = {
 			const stage = emit.newVarName('stage');
 
 			return {
-				lines: [
-					`const ${stage} = runtime.getTargetForStage();`,
-					`${setBackdrop(emit)}(${stage}, ${stage}.currentCostume + 1, true);`
+				statements: [
+					ir.declaration('const', stage, ir.source('runtime.getTargetForStage()')),
+					ir.statement(setBackdrop(emit), '(', stage, ', ', stage, '.currentCostume + 1, true)')
 				]
 			};
 		},
@@ -187,37 +224,52 @@ module.exports = {
 			const amount = emit.newVarName('value');
 
 			return {
-				lines: [
-					...value.lines,
-					'{',
-					`\tconst ${effect} = Cast.toString(${emit.field(block, 'EFFECT')}).toLowerCase();`,
-					`\tconst ${amount} = ${clampEffect(emit)}(${effect}, Cast.toNumber(${value.source}));`,
-					`\ttarget.setEffect(${effect}, ${amount});`,
-					'}'
+				statements: [
+					...value.statements,
+					ir.block([
+						ir.declaration('const', effect, ir.source([
+							'Cast.toString(', emit.field(block, 'EFFECT'), ').toLowerCase()'
+						])),
+						ir.declaration('const', amount, ir.source([
+							clampEffect(emit), '(', effect, ', Cast.toNumber(', value.source, '))'
+						])),
+						ir.statement('target.setEffect(', effect, ', ', amount, ')')
+					])
 				]
 			};
 		},
 
-		looks_cleargraphiceffects: () => ({lines: ['target.clearEffects();']}),
+		looks_cleargraphiceffects: () => ({
+			statements: [ir.statement('target.clearEffects()')]
+		}),
 
 		looks_changesizeby: (emit, block) => {
 			const change = emit.input(block, 'CHANGE');
 
 			return {
-				lines: [...change.lines, `target.setSize(target.size + Cast.toNumber(${change.source}));`]
+				statements: [
+					...change.statements,
+					ir.statement(
+						'target.setSize(target.size + Cast.toNumber(', change.source, '))'
+					)
+				]
 			};
 		},
 
-		looks_setsizeto: (emit, block) => setSize(emit, emit.input(block, 'SIZE')),
+		looks_setsizeto: (emit, block) => setSize(emit.input(block, 'SIZE')),
 
 		looks_gotofrontback: (emit, block) => {
 			const option = emit.field(block, 'FRONT_BACK');
 
 			return {
-				lines: [
-					'if (!target.isStage) {',
-					`\tif (${option} === 'front') target.goToFront(); else target.goToBack();`,
-					'}'
+				statements: [
+					ir.ifThen(ir.source('!target.isStage'), [
+						ir.ifThen(
+							ir.source([option, " === 'front'"]),
+							[ir.statement('target.goToFront()')],
+							[ir.statement('target.goToBack()')]
+						)
+					])
 				]
 			};
 		},
@@ -227,12 +279,15 @@ module.exports = {
 			const num = emit.input(block, 'NUM');
 
 			return {
-				lines: [
-					...num.lines,
-					'if (!target.isStage) {',
-					`\tif (${option} === 'forward') target.goForwardLayers(Cast.toNumber(${num.source}));`,
-					`\telse target.goBackwardLayers(Cast.toNumber(${num.source}));`,
-					'}'
+				statements: [
+					...num.statements,
+					ir.ifThen(ir.source('!target.isStage'), [
+						ir.ifThen(
+							ir.source([option, " === 'forward'"]),
+							[ir.statement('target.goForwardLayers(Cast.toNumber(', num.source, '))')],
+							[ir.statement('target.goBackwardLayers(Cast.toNumber(', num.source, '))')]
+						)
+					])
 				]
 			};
 		},
@@ -241,9 +296,9 @@ module.exports = {
 		// keep on the target, so these two call their implementation.
 		looks_show: (emit, block) => emit.emitPrimitiveCall(block, false, {branches: false}),
 		looks_hide: (emit, block) => emit.emitPrimitiveCall(block, false, {branches: false}),
-		looks_hideallsprites: () => ({lines: []}),
-		looks_changestretchby: () => ({lines: []}),
-		looks_setstretchto: () => ({lines: []}),
+		looks_hideallsprites: () => ({statements: []}),
+		looks_changestretchby: () => ({statements: []}),
+		looks_setstretchto: () => ({statements: []}),
 		looks_sayforsecs: (emit, block) => emit.emitPrimitiveCall(block, false, {branches: false}),
 		looks_thinkforsecs: (emit, block) => emit.emitPrimitiveCall(block, false, {branches: false}),
 		looks_switchbackdroptoandwait: (emit, block) =>
